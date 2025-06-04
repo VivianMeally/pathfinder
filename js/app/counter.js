@@ -1,13 +1,15 @@
 define([
     'jquery',
-    'app/init',
-    'app/util'
-], function($, Init, Util) {
+    'app/util',
+    'app/lib/cron'
+], ($, Util, Cron) => {
     'use strict';
 
     let config = {
-      counterDigitSmallClass: 'pf-digit-counter-small',
-      counterDigitLargeClass: 'pf-digit-counter-large'
+        counterTaskAttr: 'data-counter-task',                                           // element attr name with initialized counter name
+        counterStopClass: 'stopCounter',                                                // class for counter elements where counter should be destroyed
+        counterDigitSmallClass: 'pf-digit-counter-small',                               // class for 'small' counter DOM elements (e.g. 'hour' number)
+        counterDigitLargeClass: 'pf-digit-counter-large'                                // class for 'large' counter DOM elements (e.g. 'days' number)
     };
 
     /**
@@ -16,7 +18,7 @@ define([
      * @param tempDate
      * @param round
      */
-    let updateDateDiff = function(element, tempDate, round){
+    let updateDateDiff = (element, tempDate, round) => {
         let diff = Util.getTimeDiffParts(tempDate, new Date());
         let days = diff.days;
         let hrs = diff.hours;
@@ -57,62 +59,95 @@ define([
             }
         }
 
-
-
         element.html(parts.join(' '));
     };
 
     /**
      * destroy all active counter recursive
      */
-    $.fn.destroyTimestampCounter = function(){
-        return this.each(function(){
+    let destroyTimestampCounter = (element, recursive) => {
+        let counterTaskSelector = '[' + config.counterTaskAttr + ']';
+        let counterElements = element.filter(counterTaskSelector);
+        if(recursive){
+            counterElements = counterElements.add(element.find(counterTaskSelector));
+        }
+
+        counterElements.each(function(){
             let element = $(this);
-            element.find('[data-counter="init"]').each(function(){
-                let interval = $(this).data('interval');
-                if(interval){
-                    clearInterval(interval);
-                    element.removeAttr('data-counter')
-                        .removeData('interval')
-                        .removeClass('stopCounter');
-                }
-            });
+            let taskName = element.attr(config.counterTaskAttr);
+
+            if(Cron.delete(taskName)){
+                element.removeAttr(config.counterTaskAttr).removeClass(config.counterStopClass);
+            }
         });
     };
 
     /**
      * init a live counter based on a unix timestamp
-     * @param round string e.g. 'd' => round days
+     * @param element
+     * @param round     e.g. 'd' => round days
+     * @returns {void|*|undefined}
      */
-    $.fn.initTimestampCounter = function(round){
-        return this.each(function(){
-            let element = $(this);
-            let timestamp = parseInt( element.text() );
+    let initTimestampCounter = (element, round) => {
+        let timestamp = parseInt(element.text());
+        // do not init twice
+        if(timestamp > 0){
+            let taskName = element.attr('id') || Util.getRandomString();
+            let date = new Date( timestamp * 1000);
+            updateDateDiff(element, date, round);
 
-            // do not init twice
-            if(timestamp > 0){
-                // mark as init
-                element.attr('data-counter', 'init');
+            // show element (if invisible) after first update
+            element.css({'visibility': 'initial'});
 
-                let date = new Date( timestamp * 1000);
+            let counterTask = Cron.new(taskName, {precision: 'seconds', interval: 1, timeout: 100});
+            counterTask.task = () => {
+                if(element.hasClass(config.counterStopClass)){
+                    destroyTimestampCounter(element);
+                }else{
+                    updateDateDiff(element, date, round);
+                }
+            };
+            counterTask.start();
 
-                updateDateDiff(element, date, round);
+            element.attr(config.counterTaskAttr, taskName);
+        }
+    };
 
-                // show element (if invisible) after first update
-                element.css({'visibility': 'initial'});
+    /**
+     * init global timestamp counter or DataTable for specific columns
+     * @param tableElement
+     * @param columnSelector
+     * @param round
+     */
+    let initTableCounter = (tableElement, columnSelector, round) => {
+        let tableApi = tableElement.api();
+        let taskName = tableElement.attr('id');
 
-                let refreshIntervalId = window.setInterval(function(){
-
-                    // update element with current time
-                    if( !element.hasClass('stopCounter')){
-                        updateDateDiff(element, date, round);
-                    }else{
-                        clearInterval( element.data('interval') );
-                    }
-                }, 500);
-
-                element.data('interval', refreshIntervalId);
+        let cellUpdate = function(rowIndex, colIndex, tableLoopCount, cellLoopCount){
+            let cell = this;
+            let node = cell.node();
+            let data = cell.data();
+            if(data && Number.isInteger(data) && !node.classList.contains(config.counterStopClass)){
+                // timestamp expected int > 0
+                let date = new Date(data * 1000);
+                updateDateDiff(cell.nodes().to$(), date, round);
             }
-        });
+        };
+
+        let counterTask = Cron.new(taskName, {precision: 'seconds', interval: 1, timeout: 100});
+        counterTask.task = timer => {
+            tableApi.cells(null, columnSelector).every(cellUpdate);
+        };
+        counterTask.start();
+
+        tableElement.attr(config.counterTaskAttr, taskName);
+    };
+
+    return {
+        config: config,
+        updateDateDiff: updateDateDiff,
+        initTimestampCounter: initTimestampCounter,
+        initTableCounter: initTableCounter,
+        destroyTimestampCounter: destroyTimestampCounter
     };
 });

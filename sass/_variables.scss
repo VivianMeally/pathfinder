@@ -33,13 +33,14 @@ $pf-font-path:            "../../fonts" !default;
 
 @font-face {
   font-family: 'Oxygen';
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
   src: url('#{$pf-font-path}/oxygen-regular-webfont.eot');
   src: url('#{$pf-font-path}/oxygen-regular-webfont.eot') format('embedded-opentype'),
   url('#{$pf-font-path}/oxygen-regular-webfont.woff2') format('woff2'),
   url('#{$pf-font-path}/oxygen-regular-webfont.woff') format('woff'),
   url('#{$pf-font-path}/oxygen-regular-webfont.ttf') format('truetype');
-  font-weight: 400;
-  font-style: normal;
 }
 
 /* not used jet
@@ -56,13 +57,14 @@ $pf-font-path:            "../../fonts" !default;
 
 @font-face {
   font-family: 'Oxygen Bold';
+  font-weight: 700;
+  font-style: normal;
+  font-display: swap;
   src: url('#{$pf-font-path}/oxygen-bold-webfont.eot');
   src: url('#{$pf-font-path}/oxygen-bold-webfont.eot') format('embedded-opentype'),
   url('#{$pf-font-path}/oxygen-bold-webfont.woff2') format('woff2'),
   url('#{$pf-font-path}/oxygen-bold-webfont.woff') format('woff'),
   url('#{$pf-font-path}/oxygen-bold-webfont.ttf') format('truetype');
-  font-weight: 700;
-  font-style: normal;
 }
 
 
@@ -72,6 +74,7 @@ $font-family-sans-serif:  'Oxygen', "Helvetica Neue", Helvetica, Arial, sans-ser
 $font-family-serif:       'Oxygen' Georgia, "Times New Roman", Times, serif !default;
 $font-family-monospace:   Consolas, monospace, Menlo, Monaco, "Courier New";
 $font-family-bold:        'Oxygen Bold', "Helvetica Neue", Helvetica, Arial, sans-serif !default;
+$font-family-readable:    'Arial', 'Oxygen Bold', "Helvetica Neue", Helvetica, sans-serif !default;
 $font-family-base:        $font-family-sans-serif;
 $font-style-base:         normal;
 $font-weight-base:        400;
@@ -170,7 +173,7 @@ $btn-default-border:             darken($gray-light, 5%);
 
 $btn-primary-color:              $gray-lightest;
 $btn-primary-bg:                 $brand-primary;
-$btn-primary-border:             darken($btn-primary-bg, 5%);
+$btn-primary-border:             darken($btn-primary-bg, 2%);
 
 $btn-success-color:              $gray-lightest;
 $btn-success-bg:                 $brand-success;
@@ -313,7 +316,7 @@ $container-tablet:             ((720px + $grid-gutter-width));
 $container-sm:                 $container-tablet;
 
 // Medium screen / desktop
-$container-desktop:            ((1040px + $grid-gutter-width));
+$container-desktop:            ((1060px + $grid-gutter-width));
 //** For `$screen-md-min` and up.
 $container-md:                 $container-desktop;
 
@@ -543,7 +546,7 @@ $modal-title-padding:         14px;
 $modal-title-line-height:     $line-height-base;
 
 $modal-content-bg:                             $gray;
-$modal-content-border-color:                   rgba(0,0,0,.2);
+$modal-content-border-color:                   transparent;
 $modal-content-fallback-border-color:          #999;
 
 $modal-backdrop-bg:           #000;
@@ -685,6 +688,12 @@ $badge-font-weight:           bold;
 $badge-line-height:           1;
 $badge-border-radius:         10px;
 
+$badge-default-bg:            $gray-light;
+$badge-primary-bg:            $brand-primary;
+$badge-success-bg:            $brand-success;
+$badge-info-bg:               $brand-info;
+$badge-warning-bg:            $brand-warning;
+$badge-danger-bg:             $brand-danger;
 
 //== Breadcrumbs
 //
@@ -720,7 +729,7 @@ $carousel-caption-color:                      #fff;
 //##
 
 $close-font-weight:           bold;
-$close-color:                 $red-darker;
+$close-color:                 $red-dark;
 $close-text-shadow:           0 1px 0 #fff;
 
 
@@ -734,8 +743,8 @@ $code-bg:                     $gray-light;
 $kbd-color:                   $gray-lighter;
 $kbd-bg:                      $gray-darker;
 
-$pre-bg:                      $gray-light;
-$pre-color:                   $gray-darkest;
+$pre-bg:                      $gray-dark;
+$pre-color:                   $gray-light;
 $pre-border-color:            #ccc;
 $pre-scrollable-max-height:   340px;
 
@@ -748,8 +757,8 @@ $text-muted:                  $gray-light;
 $abbr-border-color:           $gray-light;
 $headings-small-color:        $gray-light;
 $blockquote-small-color:      $gray-light;
-$blockquote-font-size:        ($font-size-base * 1.25);
-$blockquote-border-color:     $green;
+$blockquote-font-size:        ($font-size-base * 1.20);
+$blockquote-border-color:     $brand-info;
 $page-header-border-color:    $gray-lighter;
 
 
@@ -761,7 +770,7 @@ $page-header-border-color:    $gray-lighter;
 $hr-border:                   $gray-lighter;
 
 //** Horizontal offset for forms and lists.
-$component-offset-horizontal: 100px;
+$component-offset-horizontal: 120px;
 
 /* SMARTADMIN VARIABLES
  * All variables related specifically to the theme starts from here:
@@ -811,7 +820,6 @@ $base-url: "../../img";
 $html-background-image: "";
 $html-background-color: $bg-color;
 
-$body-background-image: "pf-bg.jpg";
 $body-background-color: $bg-color;
 
 //== HEADER

@@ -2,69 +2,36 @@
  *  Render controller
  */
 
-define(['jquery', 'mustache'], function($, Mustache) {
+define(['jquery', 'mustache'], ($, Mustache) => {
 
     'use strict';
 
     /**
-     * init function will be called before and after a new module is loaded
-     * @param functionName
-     * @param config
-     */
-    let initModule = function(functionName, config){
-
-        if(
-            typeof config.functions === 'object' &&
-            typeof config.functions[functionName] === 'function'
-        ){
-            config.functions[functionName](config);
-        }
-    };
-
-    /**
-     * load a template and render is with Mustache
-     * @param config
+     * render Mustache template
+     * @param path
      * @param data
+     * @returns {Promise<any>}
      */
-    let showModule = function(config, data){
-        // require module template
-        requirejs(['text!templates/' + config.name + '.html'], function(template) {
-            // check for an id, if module already exists, do not insert again
-            if(
-                data.id === 'undefined' ||
-                 $('#' + data.id).length === 0
-            ){
-                let content = Mustache.render(template, data);
-
-                // display module
-                switch(config.link){
-                    case 'prepend':
-                        config.position.prepend(content);
-                        break;
-                    case 'before':
-                        config.position.before(content);
-                        break;
-                    case 'after':
-                        config.position.after(content);
-                        break;
-                    default:
-                        config.position.append(content);
-                }
-            }
-
-            // init module function after render
-            initModule('after', config);
-        });
+    let render = (path, data) => {
+        let renderExecutor = resolve => {
+            requirejs(['text!templates/' + path + '.html'], template => {
+                resolve(Mustache.render(template, data));
+            });
+        };
+        return new Promise(renderExecutor);
     };
 
     /**
      * convert JSON object into HTML highlighted string
      * @param obj
+     * @param options
      */
-    let highlightJson = (obj) => {
+    let highlightJson = (obj, options = {}) => {
+        let maxLinesFunctions = options.maxLinesFunctions || 5;
+
         let multiplyString = (num, str) =>  {
             let sb = [];
-            for (let i = 0; i < num; i++) {
+            for(let i = 0; i < num; i++){
                 sb.push(str);
             }
             return sb.join('');
@@ -75,79 +42,93 @@ define(['jquery', 'mustache'], function($, Mustache) {
         let tab = multiplyString(1, '  ');
         let isCollapsible = true;
         let quoteKeys = false;
-        let expImageClicked = '(() => {let container=this.parentNode.nextSibling; container.style.display=container.style.display===\'none\'?\'inline\':\'none\'})();';
+        let expImageClicked = '(() => {this.classList.toggle(\'fa-minus-square\'); ' +
+            'this.classList.toggle(\'fa-plus-square\'); ' +
+            'let container=this.parentNode.nextSibling; ' +
+            'container.style.display=container.style.display===\'none\'?\'inline\':\'none\'})();';
 
-        let checkForArray = function (obj) {
+        let checkForArray = function(obj){
             return obj &&
                 typeof obj === 'object' &&
                 typeof obj.length === 'number' &&
                 !(obj.propertyIsEnumerable('length'));
         };
 
-        let getRow = function (indent, data, isPropertyContent) {
+        let getRow = function(indent, data, isPropertyContent){
             let tabs = '';
-            for (let i = 0; i < indent && !isPropertyContent; i++) tabs += tab;
-            if (data !== null && data.length > 0 && data.charAt(data.length - 1) !== '\n')
+            for(let i = 0; i < indent && !isPropertyContent; i++) tabs += tab;
+            if(data !== null && data.length > 0 && data.charAt(data.length - 1) !== '\n')
                 data = data + '\n';
             return tabs + data;
         };
 
-        let formatLiteral = function (literal, quote, comma, indent, isArray, style) {
-            if (typeof literal === 'string')
+        let formatLiteral = function(literal, quote, comma, indent, isArray, style){
+            if(typeof literal === 'string')
                 literal = literal.split('<').join('&lt;').split('>').join('&gt;');
             let str = '<span class="' + style + '">' + quote + literal + quote + comma + '</span>';
-            if (isArray) str = getRow(indent, str);
+            if(isArray) str = getRow(indent, str);
             return str;
         };
 
-        let formatFunction = function (indent, obj) {
+        let formatFunction = function(indent, obj){
             let tabs = '';
-            for (let i = 0; i < indent; i++) tabs += tab;
-            let funcStrArray = obj.toString().split('\n');
+            for(let i = 0; i < indent; i++) tabs += tab;
+            let funcStrArray = obj.toString().split('\n', maxLinesFunctions);
             let str = '';
-            for (let i = 0; i < funcStrArray.length; i++) {
-                str += ((i === 0) ? '' : tabs) + funcStrArray[i] + '\n';
+            for(let i = 0; i < funcStrArray.length; i++){
+                str += ((i === 0) ? '' : '') + funcStrArray[i] + '\n';
             }
-            return str;
+            return str + tabs;
         };
 
 
         let highlight = (obj, indent, addComma, isArray, isPropertyContent) => {
+            // check if recursive call depth leads to collapsed data
+            let startCollapseIcon = options.collapseDepth <= indent ? 'fa-plus-square' : 'fa-minus-square';
+            let startCollapseStyle = options.collapseDepth <= indent ? 'none' : 'inline';
+
             let html = '';
+
+            // check max recursion depth
+            if(indent > (options.maxDepth || 8)){
+                return html;
+            }
 
             let comma = (addComma) ? '<span class="pf-code-Comma">,</span> ' : '';
             let type = typeof obj;
             let clpsHtml = '';
-            if (checkForArray(obj)) {
-                if (obj.length === 0) {
+            if(checkForArray(obj)){
+                if(obj.length === 0){
                     html += getRow(indent, '<span class="pf-code-ArrayBrace">[ ]</span>' + comma, isPropertyContent);
-                } else {
-                    clpsHtml = isCollapsible ? '<span><i class="fas fa-fw fa-plus-square" onClick="' + expImageClicked + '"></i></span><span class="collapsible">' : '';
+                }else{
+                    clpsHtml = isCollapsible ? '<span><i class="pf-module-icon-button fas fa-fw ' + startCollapseIcon + '" onClick="' + expImageClicked + '"></i></span>' +
+                        '<span class="collapsible" style="display:'+ startCollapseStyle +'">' : '';
                     html += getRow(indent, '<span class="pf-code-ArrayBrace">[</span>' + clpsHtml, isPropertyContent);
-                    for (let i = 0; i < obj.length; i++) {
+                    for(let i = 0; i < obj.length; i++){
                         html += highlight(obj[i], indent + 1, i < (obj.length - 1), true, false);
                     }
                     clpsHtml = isCollapsible ? '</span>' : '';
                     html += getRow(indent, clpsHtml + '<span class="pf-code-ArrayBrace">]</span>' + comma);
                 }
-            } else if (type === 'object') {
-                if (obj === null) {
+            }else if(type === 'object'){
+                if(obj === null){
                     html += formatLiteral('null', '', comma, indent, isArray, 'pf-code-Null');
-                } else if (obj.constructor === dateObj.constructor) {
-                    html += formatLiteral('new Date(' + obj.getTime() + ') /*' + obj.toLocaleString() + '*/', '', comma, indent, isArray, 'Date');
-                } else if (obj.constructor === regexpObj.constructor) {
+                }else if(obj.constructor === dateObj.constructor){
+                    html += formatLiteral('new Date(' + obj.getTime() + ') &lt;' + obj.toLocaleString('en-GB') + '&gt;', '', comma, indent, isArray, 'pf-code-Date');
+                }else if(obj.constructor === regexpObj.constructor){
                     html += formatLiteral('new RegExp(' + obj + ')', '', comma, indent, isArray, 'RegExp');
-                } else {
+                }else{
                     let numProps = 0;
-                    for (let prop in obj) numProps++;
-                    if (numProps === 0) {
+                    for(let prop in obj) numProps++;
+                    if(numProps === 0){
                         html += getRow(indent, '<span class="pf-code-ObjectBrace">{ }</span>' + comma, isPropertyContent);
-                    } else {
-                        clpsHtml = isCollapsible ? '<span><i class="fas fa-fw fa-plus-square" onClick="' + expImageClicked + '"></i></span><span class="collapsible">' : '';
+                    }else{
+                        clpsHtml = isCollapsible ? '<span><i class="pf-module-icon-button fas fa-fw ' + startCollapseIcon + '" onClick="' + expImageClicked + '"></i></span>' +
+                            '<span class="collapsible" style="display:'+ startCollapseStyle +'">' : '';
                         html += getRow(indent, '<span class="pf-code-ObjectBrace">{</span>' + clpsHtml, isPropertyContent);
                         let j = 0;
-                        for (let prop in obj) {
-                            if (obj.hasOwnProperty(prop)) {
+                        for(let prop in obj){
+                            if(obj.hasOwnProperty(prop)){
                                 let quote = quoteKeys ? '"' : '';
                                 html += getRow(indent + 1, '<span class="pf-code-PropertyName">' + quote + prop + quote + '</span>: ' + highlight(obj[prop], indent + 1, ++j < numProps, false, true));
                             }
@@ -156,20 +137,20 @@ define(['jquery', 'mustache'], function($, Mustache) {
                         html += getRow(indent, clpsHtml + '<span class="pf-code-ObjectBrace">}</span>' + comma);
                     }
                 }
-            } else if (type === 'number') {
+            }else if(type === 'number'){
                 html += formatLiteral(obj, '', comma, indent, isArray, 'pf-code-Number');
-            } else if (type === 'boolean') {
+            }else if(type === 'boolean'){
                 html += formatLiteral(obj, '', comma, indent, isArray, 'pf-code-Boolean');
-            } else if (type === 'function') {
-                if (obj.constructor === regexpObj.constructor) {
+            }else if(type === 'function'){
+                if(obj.constructor === regexpObj.constructor){
                     html += formatLiteral('new RegExp(' + obj + ')', '', comma, indent, isArray, 'RegExp');
-                } else {
+                }else{
                     obj = formatFunction(indent, obj);
                     html += formatLiteral(obj, '', comma, indent, isArray, 'pf-code-Function');
                 }
-            } else if (type === 'undefined') {
+            }else if(type === 'undefined'){
                 html += formatLiteral('undefined', '', comma, indent, isArray, 'pf-code-Null');
-            } else {
+            }else{
                 html += formatLiteral(obj.toString().split('\\').join('\\\\').split('"').join('\\"'), '"', comma, indent, isArray, 'pf-code-String');
             }
 
@@ -180,7 +161,7 @@ define(['jquery', 'mustache'], function($, Mustache) {
     };
 
     return {
-        showModule: showModule,
+        render: render,
         highlightJson: highlightJson
     };
 });

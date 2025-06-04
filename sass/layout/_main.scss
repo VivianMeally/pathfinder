@@ -1,3 +1,9 @@
+$endpointBubbleWidth: 18px;
+
+:fullscreen{
+  overflow-y: scroll; // overwrites browser default
+}
+
 body{
   // prevent marking text
   -webkit-touch-callout: none;
@@ -9,11 +15,7 @@ body{
   cursor: default;
 }
 
-.pf-body{
-  overflow: hidden;
-}
-
-
+// links ==========================================================================================
 a, .pf-link{
   color: $teal;
   will-change: color;
@@ -29,16 +31,25 @@ a, .pf-link{
   &:focus{
     color: $teal;
   }
+
+  &.disabled{
+    color: $navbar-default-link-color;
+    pointer-events: none;
+    cursor: default;
+  }
 }
 
-// emphasized text
-em{
-
+em,
+.pf-font-italic{
   font-style: italic;
 
   &.pf-brand{
     text-transform: uppercase;
   }
+}
+
+.pf-font-uppercase{
+  text-transform: uppercase;
 }
 
 .pf-font-capitalize{
@@ -49,11 +60,76 @@ em{
   text-decoration: line-through;
 }
 
+.pf-text-ellipsis{
+  text-overflow: ellipsis;
+  overflow: hidden;
+  white-space: nowrap;
+}
+
+.fa-char{
+  &:before{
+    font-family: Arial, sans-serif;
+    font-weight: bold;
+    content: attr(data-char-content);
+  }
+}
+
+.fa-tree-child{
+  @extend .fa-fw;
+  @extend .fa-lg;
+  @extend .fa-level-up-alt;
+  @extend .fa-rotate-90;
+  color: $gray-light;
+  padding-right: 5px;
+}
+
+.no-scroll{
+  overflow: hidden;
+}
+
 .no-padding{
   padding: 0 !important;
 }
 
-// scroll bar (webkit only) =======================================================================
+.no-margin{
+  margin: 0 !important;
+}
+
+// show/hide by [data-attr] value =================================================================
+.pf-hidden-by-attr{
+  &[data-attr='']{
+    display: none;
+  }
+
+  &:not([data-attr='']){
+    display: initial;
+  }
+
+  &:before{
+    content: attr(data-attr) ' ' attr(data-attr-label);
+  }
+}
+
+.pf-shown-by-attr{
+  &[data-attr='']{
+    display: initial;
+  }
+
+  &:not([data-attr='']){
+    display: none;
+  }
+
+  &:before{
+    content: attr(data-attr) ' ' attr(data-attr-label);
+  }
+}
+
+// scroll bar =====================================================================================
+html{
+  scrollbar-width: thin;            // Firefox
+  scrollbar-color: #717171 #222223; // Firefox
+}
+
 ::-webkit-scrollbar {
   display: none;  // hides the scrollbar but is still scrollable
   width: 16px;
@@ -98,6 +174,41 @@ em{
   background: $gray-lighter; /* Gecko Browsers */
   color: $gray-darkest;
 }
+
+.row{
+  // swap render order
+  &--reverse{
+    display: flex;
+    flex-direction: column-reverse;
+  }
+}
+
+// Flex layout ====================================================================================
+.pf-container-flex-end{
+  display: flex;
+  justify-content: flex-end;
+}
+
+// .well variants =================================================================================
+.well{
+  &.well-text-number{
+    // .well with improved contrast
+    font-family: Oxygen, Arial, sans-serif;
+    font-weight: bold;
+    letter-spacing: .02em;
+    line-height: 16px;
+    text-rendering: geometricPrecision;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    overflow: hidden;
+  }
+}
+
+// .collapse ======================================================================================
+.collapse{
+  will-change: height;
+}
+
 // help elements ==================================================================================
 .pf-help-light{
   @extend .txt-color;
@@ -113,6 +224,7 @@ em{
 
 .pf-help-default{
   cursor: help;
+  pointer-events: auto;   // enable mouse events even if a parent was set to 'none' (e.g. disabled xEditable cells in sig-reader dialog table)
   @include transition( color 0.08s ease-out );
 
   &:hover{
@@ -133,10 +245,36 @@ em{
 
 .pf-module-icon-button{
   cursor: pointer;
+  color: $gray-light; // overwrite xEditable button style
   @include transition(color 0.15s ease-out);
+
+  &.fas {
+    position: relative; // for absolute positioned [data-badge]:after elements
+  }
 
   &:hover, &.active{
     color: $orange !important;
+  }
+
+  &.editable{
+    border-bottom: none !important; // overwrite xEditable button style
+  }
+
+  &[data-badge]:after {
+    content: attr(data-badge);
+    position: absolute;
+    top: -8px;
+    left: calc(100% - 5px);
+    color: $orange;
+    border-radius: 9px;
+    padding: 3px 4px;
+    font-size: 11px;
+    font-weight: bold;
+    line-height: 1;
+    vertical-align: baseline;
+    white-space: nowrap;
+    text-align: center;
+    font-family: Oxygen, Arial, sans-serif;
   }
 }
 
@@ -146,33 +284,136 @@ em{
   user-select: text;
 }
 
-// links ==========================================================================================
-a{
-  &.disabled{
-    color: $navbar-default-link-color;
-    pointer-events: none;
-    cursor: default;
-  }
+%pf-bg-image-wrapper{
+  background-size: contain;
+  background-origin: content-box;
+  background-repeat: no-repeat;
+  background-image: var(--bg-image);
+  background-position: bottom 0 right 0;
+  image-rendering: -webkit-optimize-contrast;
 }
 
+.pf-bg-icon-inline{
+  @extend %pf-bg-image-wrapper;
+  display: inline-block;
+  width: 20px;
+  height: 20px;
+  margin: -5px 5px;
+  outline: 1px solid;
+  outline-color: transparent;
+  outline-offset: 2px;
+  @include transition(outline-color 0.15s ease-out);
+
+  &:hover{
+    outline-color: $teal;
+  }
+}
 // alert messages =================================================================================
 .alert{
   will-change: opacity, transform;
 }
 
 // form fields custom styles ======================================================================
-.editable-input{
-  optgroup[label]{
+.editable-input {
+
+  optgroup[label] {
     background-color: $gray;
     color: $gray-light;
 
-    option{
+    option {
       background-color: $gray-dark;
       color: $gray-lighter;
       font-family: $font-family-monospace;
     }
   }
+
+  .editable-checklist {
+    > div > label {
+      @extend .checkbox;
+      display: block !important;
+      padding-left: 20px !important; // overwrite inline-form styles
+      color: $gray-lighter;
+
+      > span {
+        @extend label;
+
+        &:after {
+          top: -2px;
+        }
+      }
+    }
+
+    // layout settings popover (active map modules)
+    &.pf-editable-settings {
+      display: grid;
+      column-gap: 15px;
+      grid-template-columns: repeat(2, auto);
+      align-items: end;
+
+      > .pf-editable-headline {
+        grid-column: 1;
+
+        &:before {
+          content: attr(data-headline);
+          display: block;
+          text-transform: capitalize;
+          font-weight: bold;
+          line-height: 18px;
+          margin-bottom: 5px;
+          margin-top: 5px;
+          color: lighten($gray-light, 10%);
+          padding-left: 25px;
+        }
+
+        + .pf-editable-headline[data-count='1'] {
+          grid-column: 2;
+        }
+      }
+    }
+
+    .pf-editable-unknown[value='0'] + span {
+      color: $red;
+    }
+
+    .pf-editable-warn + span {
+      color: $orange;
+    }
+  }
+
+  // toggle 2 elements active (settings popover)
+  .pf-editable-toggle {
+    display: flex;
+    margin-bottom: 5px;
+    justify-content: space-between;
+    align-items: center;
+
+    .pf-editable-toggle-item {
+      @extend %pf-bg-image-wrapper;
+      width: 98px;
+      height: 68px;
+      background-color: lighten($gray-light, 10%);
+      padding: 3px;
+      border-radius: 4px;
+      border: 1px solid $gray-dark;
+      cursor: pointer;
+      @include transition(background-color 0.08s ease-out);
+      will-change: background-color;
+
+      &.active {
+        background-color: $teal;
+      }
+
+      &:hover {
+        background-color: $teal-lighter;
+      }
+
+      + .fas {
+        margin: 0 10px;
+      }
+    }
+  }
 }
+
 select:active, select:hover {
   outline: none
 }
@@ -183,9 +424,20 @@ select:active, select:hover {
 }
 
 // select2 custom template ========================================================================
-.select2-results{
+.select2-results,
+.select2-container--pathfinder {
   [class*="col-"]{
-    line-height: 22px;
+    // smaller and less padding
+    padding-left: 3px;
+    padding-right: 3px;
+
+    &:first-child{
+      padding-left: 0;
+    }
+
+    &:last-child{
+      padding-right: 0;
+    }
   }
 }
 
@@ -193,23 +445,122 @@ select:active, select:hover {
   ::-webkit-search-cancel-button{
     -webkit-appearance: none !important;
   }
+}
 
-  .select2-selection__choice__remove{
-    float: left;
+.select2-results.mCustomScrollbar{
+  .select2-results__option--load-more{
+    position: absolute;
+    margin-top: 50px; // margin gets removed on totalScroll -> enables ajax select options to load next page
+  }
+}
+// global dataTable styles ========================================================================
+.dataTables_wrapper{
+
+  .dataTables_length select{
+    margin: 0 3px;  // <select> for page size
+    padding: 1px;
   }
 
-  .select2-selection--multiple{
-    input{
-      box-shadow: none !important;
+  .pf-table-toolbar-status{
+    text-align: center;
+    line-height: 22px;
+    color: $gray-light;
+  }
+
+  .dataTables_filter {
+    margin-top: 0;  // overwrite default (mobile breakpoint)
+
+    @media (max-width: $screen-xs-max) {
+      input[type='search'] {
+        width: 100px;
+      }
+    }
+  }
+
+  .dt-buttons,
+  .dt-stats{
+    display: inline-block;
+
+    .dt-button{
+      padding: 0 5px;     // overwrite default
+      line-height: 22px;  // overwrite default
+      margin-bottom: 0;   // overwrite default
+
+      &:not(:last-child){
+        margin-right: 5px;
+      }
+    }
+
+    .dt-button,
+    .dt-stat{
+      .fas{
+        margin-right: 5px;
+      }
+
+      &.disabled{
+        color: darken($gray-light, 8%)
+      }
+
+      &.processing{
+        &:after {
+          border: 2px solid darken($gray-light, 8%);
+          border-left-color: $orange;
+          border-right-color: $orange;
+        }
+      }
     }
   }
 }
 
-// global dataTable styles ========================================================================
+// condensed dataTable toolbar
+.pf-dataTable-condensed-toolbar{
+  padding-top: 3px;
+
+  .dataTables_info{
+    padding-top: 0;
+    text-align: left;
+  }
+
+  .dataTables_paginate{
+    padding-top: 0;
+    margin-top: 0;
+
+    .paginate_button{
+      padding: 0;
+      height: 13px;
+      border: 0 !important;
+
+      &:before, &:after{
+        top: 0;
+      }
+      &:hover{
+        background: transparent !important;
+        color: $orange !important;
+      }
+    }
+  }
+
+  .dt-buttons{
+    text-align: right;
+    margin-bottom: 0;
+    float: right !important;
+
+    .dt-button{
+      line-height: 18px;
+      padding-right: 0;
+
+      .fa{
+        margin-right: 0;
+      }
+    }
+  }
+}
+
 .dataTable{
   th{
     &.pf-table-image-cell,
-    &.pf-table-image-small-cell{
+    &.pf-table-image-small-cell,
+    &.pf-table-image-smaller-cell{
       // no padding for image content
       padding-left: 0 !important;
       padding-right: 0 !important;
@@ -223,8 +574,45 @@ select:active, select:hover {
     }
   }
 
+  tr {
+    &.group{
+      background-color: rgba($gray-darker, 0.4);
+    }
+  }
+
   // "special" column styles
   td{
+
+    &.editable-disabled:focus{
+      // disabled xEditable td´s should not get focus style
+      // -> "pointer-events = none" would be nicer but does not work because "mousedown" should work -> select row function
+      outline: none;
+      background-color: transparent;
+    }
+
+    &.editable-click:not(.editable-disabled){
+      cursor: pointer;
+    }
+
+    &:focus, &.editable-open, &.cellHighlight {
+      // set td as :focus even is td content is focused
+      outline: 1px solid $orange-dark;
+      outline-offset: -1px;
+      background-color: rgba($orange-dark, .08);
+    }
+
+    > .fa-circle{
+      font-size: 9px !important; // should not be "so big" (10px default)
+    }
+
+    > .label{
+      font-size: 80%;
+    }
+
+    > .pf-fake-connection {
+      height: 3px;
+    }
+
     &.pf-table-link-cell{
       cursor: pointer;
       @extend .txt-color;
@@ -238,6 +626,10 @@ select:active, select:hover {
 
     &.pf-table-action-cell{
       cursor: pointer;
+
+      > .fas {
+        pointer-events: none; // event listeners are on parent <td> -> ignore icon in e.target
+      }
 
       // icon within <td> cell content that should be highlighted on hover
       > .pf-table-action-icon-cell{
@@ -253,8 +645,26 @@ select:active, select:hover {
       }
     }
 
+    &.pf-table-type-cell{
+      > span {
+        &:first-child{
+          display: inline-block;
+          width: 28px;
+        }
+        &:nth-child(2){
+          display: inline-block;
+          width: 22px;
+
+          kbd{
+            &:empty{
+              display: none;
+            }
+          }
+        }
+      }
+    }
+
     &.pf-table-image-cell{
-      // no padding for image content
       padding: 0 !important;
       image-rendering: -webkit-optimize-contrast;
 
@@ -272,6 +682,17 @@ select:active, select:hover {
         // overwrite "default" border for image cells
         border-left: 1px solid transparent;
         border-right: 1px solid transparent;
+      }
+    }
+
+    &.pf-table-image-smaller-cell{
+      padding: 0 !important;
+      border-right: 1px solid transparent;
+      img{
+        width: 23px; // smaller image (default 32)
+        // overwrite "default" border for image cells
+        //border-left: 1px solid transparent;
+        //border-right: 1px solid transparent;
       }
     }
 
@@ -317,6 +738,16 @@ select:active, select:hover {
     .pf-table-cell-100{
       width: 110px;
     }
+
+    .pf-endpoint-bubble{
+      width: 15px;
+      height: 15px;
+
+      &:after{
+        width: 15px;
+        height: 15px;
+      }
+    }
   }
 
   // column separator
@@ -331,6 +762,29 @@ select:active, select:hover {
     }
   }
 
+  // column highlight cell class
+  thead{
+    th.colHighlight{
+      border-bottom: 1px solid $orange-dark;
+    }
+  }
+
+  tbody{
+    td.colHighlight{
+      border-left: 1px solid $orange-dark;
+      border-right: 1px solid $orange-dark;
+      background-color: rgba($orange-dark, .08);
+    }
+
+    tr:first-child td.colHighlight{
+      border-top: 1px solid $orange-dark;
+    }
+
+    tr:last-child td.colHighlight{
+      border-bottom: 1px solid $orange-dark;
+    }
+  }
+
 }
 
 // table styles ===================================================================================
@@ -339,6 +793,16 @@ table{
   &.pf-table-fixed{
     width: 100%;
     table-layout: fixed;
+  }
+
+
+  &.collapsing{
+    @include transition( height .01s ease );
+
+  }
+
+  &.collapse.in{
+    display: table;
   }
 
   tr{
@@ -354,14 +818,85 @@ table{
   }
 
   td, th{
+    &.separator-right{
+      border-right: 1px solid $gray-dark;
+    }
+
+    &.pf-table-cell-10{
+      width: 10px;
+    }
+
     &.pf-table-cell-20{
       width: 20px;
+    }
+
+    &.pf-table-cell-50{
+      width: 50px;
+    }
+
+    &.pf-table-cell-100{
+      max-width: 100px;
     }
 
     &.pf-table-cell-ellipses-auto{
       overflow: hidden;
       text-overflow: ellipsis;
       white-space: nowrap;
+    }
+
+    &.pf-table-cell-bg-image{
+      padding: 0 0 0 5px !important;
+      vertical-align: middle !important;
+      border-top-color: transparent !important;
+
+      .pf-table-cell-bg-image-wrapper{
+        @extend %pf-bg-image-wrapper;
+        display: block;
+        width: auto;
+        height: 40px;
+        padding: 2px 0;
+
+        &.smaller{
+          height: 30px;
+        }
+      }
+    }
+
+    &.pf-table-cell-chart{
+      position: relative;
+
+      svg.peity{
+        display: block;
+        position: absolute;
+        margin-top: -2px; // ugly fix
+      }
+    }
+
+    &.pf-table-cell-progress{
+      position: relative;
+
+      &:before{
+        content: '';
+        position: absolute;
+        bottom: 0;
+        left: 0;
+        width: 0; // default if no --width var set
+        width: calc(var(--width) * 1%);
+        height: 1px;
+        border-top: 1px solid $blue;
+      }
+
+      &:after{
+        content: '';
+        position: absolute;
+        bottom: 0;
+        left: 0;
+        width: 100%;
+        height: 1px;
+        border-width: 0 2px;
+        border-style: solid;
+        border-color: $gray-lighter;
+      }
     }
   }
 }
@@ -377,11 +912,11 @@ table{
 }
 
 .pf-table-tools-action{
-  will-change: height, opacity, display;
+  will-change: height, opacity;
   opacity: 0; // triggered by js
   display: none; // triggered by js
   height: 0;
-  visibility: hidden;
+  overflow: hidden;
 }
 
 // landing indicator overlay ======================================================================
@@ -394,7 +929,7 @@ table{
   opacity: 0;
   background: $gray-darker;
   z-index: 1060;
-  @include border-radius(5px);
+  border-radius: 5px;
 
   .pf-loading-overlay-wrapper{
     width: 25px;
@@ -421,24 +956,16 @@ table{
     width: 100%;
   }
 }
-.navbar-nav {
-  li:not(.disabled):not(.hide-before){
-    &:hover, &.active{
 
-      &:before{
-        top: -4px;
-        opacity: 1;
-      }
+.modal .navbar-nav {
+  li {
+    @include pf-navigation-indicator(top);
+  }
+}
 
-    }
-
-    &:before{
-      @include navigation-active-indicator(top);
-      width: 100%;
-      height: 2px;
-      top: 0;
-    }
-
+.navbar-fixed-top .navbar-nav {
+  li {
+    @include pf-navigation-indicator(bottom);
   }
 }
 
@@ -448,21 +975,26 @@ table{
 
 // page menu ======================================================================================
 .pf-site{
+  background-color:  $body-background-color;
+  background-repeat: no-repeat;
+}
+
+.pf-menu{
+  color: $gray-light;
+  background-color: $gray-dark;
+  width: 150px;
+  transition-duration: 180ms;
   will-change: transform;
 }
 
-.sb-slidebar{
-  will-change: transform;
-}
-
-.sb-left{
+.pf-menu-left{
   .list-group-item{
     cursor: pointer;
     @include box-shadow(inset -10px 0px 5px -5px rgba(0,0,0,0.4));
   }
 }
 
-.sb-right{
+.pf-menu-right{
   .list-group-item{
     cursor: pointer;
     @include box-shadow(inset 10px 0px 5px -5px rgba(0,0,0,0.4));
@@ -480,11 +1012,30 @@ table{
       right: 8px;
     }
   }
+  &.loading{
+    pointer-events: none;
+    color: $navbar-default-link-color;
+
+    &:after{
+      content: '\f021';
+      font-family: 'Font Awesome 5 Free';
+      font-weight: bold;
+      position: absolute;
+      right: 8px;
+      animation: fa-spin 2s infinite linear;
+    }
+  }
 }
 
 // custom scrollbars ==============================================================================
 .mCSB_container, .mCSB_dragger{
-  will-change: top, left;
+  will-change: top, left, height, width;
+  transition: height .18s linear, width .18s linear; // smoother animation on window resize
+}
+
+.mCSB_container{
+  overflow-x: visible !important; // for map zoom
+  overflow-y: visible !important; // for map zoom
 }
 
 // log types ======================================================================================
@@ -521,143 +1072,9 @@ table{
   color: $teal-lighter;
 }
 
-// maps module ====================================================================================
-#pf-map-module{
-  margin: 20px 10px 0 10px;
-
-  // Tabs (colored)
-  #pf-map-tabs {
-
-    a[role="tab"]:hover{
-      .pf-map-tab-handler:before{
-        color: $orange
-      }
-    }
-
-    .pf-map-tab-handler{
-      &:before{
-        content: '\22EE\22EE\00A0';
-        display: inline-block;
-        cursor: -moz-grab !important;
-        cursor: -webkit-grab !important;
-        cursor: grab !important;
-        color: $gray-light;
-        width: 12px;
-        transition: color 0.15s ease-out, background-color 0.15s ease-out;
-        pointer-events: all;
-      }
-    }
-
-    .pf-map-type-tab-default{
-      border-top: 2px solid transparent;
-    }
-
-    .pf-map-type-tab-private{
-      border-top: 2px solid $indigo;
-    }
-
-    .pf-map-type-tab-corporation{
-      border-top: 2px solid $green;
-    }
-
-    .pf-map-type-tab-alliance{
-      border-top: 2px solid $blue;
-    }
-
-    .pf-map-type-tab-global{
-      border-top: 2px solid $teal-lighter;
-    }
-
-    .pf-map-tab-icon{
-      margin-right: 3px;
-    }
-
-    .pf-map-tab-shared-icon{
-      margin-left: 3px;
-    }
-  }
-}
-
-// Tab Content Body Grid ==========================================================================
-.pf-map-content-row{
-  margin-top: 10px;
-  padding-bottom: 40px; // space for footer
-
-  // all modules within a row
-  .pf-module{
-    font-family: $font-family-bold;
-    background: rgba($gray, 0.27);
-    padding: 10px;
-    width: 100%;
-    margin-bottom: 10px;
-    will-change: height, transform, opacity;
-    overflow: hidden;
-    @include border-radius(5px);
-
-    &:before{
-      content: '';
-      position: absolute;
-      top: 0;
-      left: 0;
-      border-style: solid;
-      border-width: 0 0 8px 8px;
-      border-color: transparent transparent transparent $gray;
-      cursor: ns-resize;
-    }
-
-    // all labels in a module
-    .label{
-      margin-bottom: 10px;
-    }
-
-    // dynamic areas as child of a module
-    .pf-dynamic-area{
-      background: rgba($gray-darker, 0.4);
-    }
-
-    .pf-module-head{
-      margin-bottom: 10px;
-
-      .pf-module-handler-drag{
-        display: inline-block;
-        cursor: -moz-grab !important;
-        cursor: -webkit-grab !important;
-        cursor: grab !important;
-        transition: color 0.15s ease-out;
-
-        &:before{
-          content: '\22EE\22EE\00A0';
-        }
-
-        &:hover{
-          color: $orange-light;
-        }
-      }
-
-      h5{
-        display: inline-block;
-        line-height: 16px;
-        margin-bottom: 0;
-
-        // icons in headline
-        .pf-module-icon-button{
-          margin-left: 5px;
-        }
-      }
-    }
-
-    // system info table
-    .pf-module-table{
-      font-size: 11px;
-      white-space: nowrap;
-    }
-  }
-
-}
-
 // User status ====================================================================================
 .pf-user-status{
-  color: $red-darker;
+  color: $red-dark;
 }
 
 .pf-user-status-corp{
@@ -672,10 +1089,28 @@ table{
   color: $indigo;
 }
 
+// Connection Endpoint types ======================================================================
+.pf-endpoint-bubble{
+  display: inline-block;
+  position: relative;
+  width: $endpointBubbleWidth;
+  height: $endpointBubbleWidth;
+
+  &:after{
+    content: var(--svgBubble);
+    display: inline-block;
+    pointer-events: none;
+    width: $endpointBubbleWidth;
+    height: $endpointBubbleWidth;
+    vertical-align: top;
+  }
+}
+
 // WH effects =====================================================================================
 .pf-system-effect{
   display: none;      // if effect is active it will be overwritten
   color: $gray-lighter;
+  cursor: help;
 }
 
 .pf-system-effect-magnetar{
@@ -709,26 +1144,30 @@ table{
 }
 
 // system info status =============================================================================
-.pf-system-info-rally{
-  .pf-system-head{
-    background-color: $pink-darker;
+.pf-rally{
+  text-shadow: 1px 1px 2px $gray-darkest; // improve text contrast
+  background-color: $pink-darker;
 
-    @include background-image(linear-gradient(-45deg,
-      $purple-dark 25%,
-      transparent 25%,
-      transparent 50%,
-      $purple-dark 50%,
-      $purple-dark 75%,
-      transparent 75%,
-      transparent));
-    background-size:25px 25px;
-    -webkit-animation:move 3s linear infinite;
-    -moz-animation:move 3s linear infinite;
-    -ms-animation:move 3s linear infinite;
-    animation:move 3s linear infinite;
-  }
+  background-image: linear-gradient(-45deg,
+          $purple-dark 25%,
+          transparent 25%,
+          transparent 50%,
+          $purple-dark 50%,
+          $purple-dark 75%,
+          transparent 75%,
+          transparent);
+  background-size: 25px 25px;
+  -webkit-animation: move 2.5s linear infinite;
+  -moz-animation: move 2.5s linear infinite;
+  -ms-animation: move 2.5s linear infinite;
+  animation: move 2.5s linear infinite;
 }
 
+.pf-system-info-rally{
+  .pf-system-head{
+    @extend .pf-rally;
+  }
+}
 
 // system security status =========================================================================
 
@@ -779,6 +1218,9 @@ table{
 // system security level ==========================================================================
 
 .pf-system-sec{
+  display: inline-block;                // fixed "blurry" text in scaled parent
+  transform: translateY(0);             // s.o.
+  -webkit-font-smoothing: antialiased;  // s.o.
   margin-right: 5px;
   cursor: -moz-grab;
   cursor: -webkit-grab;
@@ -811,6 +1253,18 @@ table{
 
 .pf-system-sec-unknown{
   color: $indigo;
+}
+
+.pf-system-sec-abyssal{
+  color: $pink;
+}
+
+.pf-system-sec-special{
+  color: $yellow-dark;
+}
+
+.pf-system-sec-drifter{
+  color: $aqua;
 }
 
 // system status ==================================================================================
@@ -868,15 +1322,74 @@ table{
   }
 }
 
-// system effect info dialog ======================================================================
-.pf-system-effect-dialog-wrapper, .pf-jump-info-dialog{
-  .table{
-    margin: 15px 0;
+// Filter =========================================================================================
+.pf-system-hidden{
+  opacity: 0.15 !important;
+  pointer-events: none;
+}
 
-    td{
-      text-transform: capitalize;
+// system effect info dialog ======================================================================
+.pf-system-effect-dialog{
+  .clearfix + .col-md-6{
+    margin-top: 10px;
+    + .col-md-6{
+      margin-top: 10px;
     }
   }
+}
+
+// planet types ===================================================================================
+.pf-planet-barren{
+  color: $planet-color-barren;
+}
+
+.pf-planet-gas{
+  color: $planet-color-gas;
+}
+
+.pf-planet-ice{
+  color: $planet-color-ice;
+}
+
+.pf-planet-lava{
+  color: $planet-color-lava;
+}
+
+.pf-planet-oceanic{
+  color: $planet-color-oceanic;
+}
+
+.pf-planet-plasma{
+  color: $planet-color-plasma;
+}
+
+.pf-planet-shattered{
+  color: $planet-color-shattered;
+}
+
+.pf-planet-storm{
+  color: $planet-color-storm;
+}
+
+.pf-planet-temperate{
+  color: $planet-color-temperate;
+}
+
+// connection size by jump mass ===================================================================
+.pf-jump-mass-xl{
+  //color: $indigo;
+}
+
+.pf-jump-mass-l{
+  //color: $blue;
+}
+
+.pf-jump-mass-m{
+  //color: $yellow-dark;
+}
+
+.pf-jump-mass-s{
+  //color: $orange;
 }
 
 // "fake connection" classes for the map manual
@@ -885,9 +1398,10 @@ table{
   display: inline-block;
   width: 70px;
   height: 4px;
+  max-width: 100%;
   border-top: 2px solid $gray-light;
   border-bottom: 2px solid $gray-light;
-  background-color: #3c3f41;
+  background-color: $gray;
   position: relative;
   font-size: 10px;
   font-family: $font-family-sans-serif;
@@ -909,6 +1423,18 @@ table{
     );
   }
 
+  &.pf-map-connection-abyssal{
+    background-color: darken($pink-darker, 8%);
+    border-color: $gray;
+    background: repeating-linear-gradient(
+                    to right,
+                    darken($pink-darker, 8%),
+                    darken($pink-darker, 8%) 5px,
+                    $gray 5px,
+                    $gray 10px
+    );
+  }
+
   &.pf-map-connection-wh-eol{
     border-color: $pink-dark;
   }
@@ -918,43 +1444,114 @@ table{
   }
 
   &.pf-map-connection-wh-critical{
-    background-color: $red-darker;
+    background-color: $red-dark;
   }
 
-  &.pf-map-connection-frig{
-    border-style: dashed;
-    border-left: none;
-    border-right: none;
+  &.pf-map-connection-wh-size-s,
+  &.pf-map-connection-wh-size-m,
+  &.pf-map-connection-wh-size-l,
+  &.pf-map-connection-wh-size-xl,
+  &.pf-map-connection-preserve-mass{
+    &:after{
+      content: '?';
+      background-color: $gray;
+      color: $gray-lighter;
+      padding: 1px 2px;
+      position: absolute;
+      left: calc(50% - 12px);
+      top: -5px;
+      font-family: Arial, sans-serif;
+      font-size: 11px;
+      line-height: 12px;
+      min-width: 14px;
+      text-align: center;
+      border-radius: 3px;
+      @include box-shadow(0 3px 6px rgba(0,0,0,.3));
+    }
+  }
+
+  &.pf-map-connection-wh-size-s{
+    border-style: dotted;
 
     &:after{
-      content: 'frig';
-      background-color: $orange;
-      color: $gray-darkest;
-      padding: 0px 3px;
-      position: absolute;
-      left: 25px;
-      top: -6px;
-      font-family: $font-family-bold;
-      @include border-radius(3px);
+      content: 'S';
+    }
+  }
+
+  &.pf-map-connection-wh-size-m{
+    border-style: dashed;
+
+    &:after{
+      content: 'M';
+    }
+  }
+
+  &.pf-map-connection-wh-size-l{
+
+    &:after{
+      content: 'L';
+    }
+  }
+
+  &.pf-map-connection-wh-size-xl{
+
+    &:after{
+      content: 'XL';
     }
   }
 
   &.pf-map-connection-preserve-mass{
+
     &:after{
       content: 'save mass';
-      background-color: $red-darker;
+      background-color: $red-dark;
       color: $gray-lightest;
-      padding: 0px 3px;
-      position: absolute;
-      left: 8px;
-      top: -6px;
-      font-family: $font-family-bold;
-      @include border-radius(3px);
+      left: calc(50% - 28px);
     }
   }
-
 }
 
+// "fake connection" classes for inline text
+.pf-fake-connection-text{
+  padding: 0 2px;
+  border-style: solid;
+  border-color: darken($gray-light, 5%);
+  border-width: 2px;
+  border-left: none;
+  border-right: none;
+
+  &.pf-wh-eol{
+    border-color: $pink-dark;
+  }
+
+  &.pf-wh-reduced{
+    background-color: $orange;
+    color: $black;
+  }
+
+  &.pf-wh-critical{
+    background-color: $red-dark;
+    color: $black;
+  }
+
+  &.pf-wh-frig{
+    border-top-style: dotted;
+    border-bottom-style: dotted;
+  }
+}
+
+// structure status ===============================================================================
+.pf-structure-status-unknown{
+  color: $teal-lighter;
+}
+
+.pf-structure-status-online{
+  color: $green;
+}
+
+.pf-structure-status-offline{
+  color: $red-dark;
+}
 
 // global tooltip settings ========================================================================
 .tooltip-inner{
@@ -962,7 +1559,7 @@ table{
   background-color: $gray;
   font-family: $font-family-bold;
   padding: 5px 5px;
-  @include border-radius(3px);
+  border-radius: 3px;
   @include box-shadow(0 6px 12px rgba(0,0,0,.4));
 }
 
@@ -996,84 +1593,6 @@ table{
   border-left-color: $gray-light;
 }
 
-// global popover settings ========================================================================
-.popover{
-  // on top of modals even if they are attached to <body>
-  z-index: $zindex-modal + 10;
-  // give large popups more space..
-  max-width: 600px;
-
-  // image in popover
-  img{
-    @include border-radius(5px);
-  }
-
-  h4{
-    color: $gray-lighter;
-  }
-
-  // table in pop popover
-  table{
-    color: $gray-lighter;
-    font-family: $font-family-bold;
-    line-height: 16px;
-    font-size: 11px;
-
-    td{
-      padding: 0 5px;
-      vertical-align: middle !important;
-    }
-  }
-}
-
-// specific "Pathfinder" Popover settings ---------------------------------------------------------
-.pf-popover{
-  display: initial;
-
-  .popover-content{
-    padding: 0; // overwrite default popover padding
-  }
-
-  h6{
-    white-space: nowrap;
-    margin-right: 50px;
-    @include clearfix();
-  }
-
-  .well{
-    margin-top: 7px;
-    margin-bottom: 10px;
-  }
-
-  .list-group{
-    margin: 0;
-
-    .list-group-item{
-      color: $gray-dark;
-
-      &:hover{
-        color: $gray-darkest;
-      }
-
-      &.disabled{
-        background-color: $gray;
-        color: $gray-light;
-        cursor: not-allowed;
-      }
-
-      img{
-        width: 30px;
-        margin: -8px 10px -6px -8px;
-        border-radius: 0; // overwrite "global"
-      }
-
-      i{
-        margin-right: 20px;
-      }
-    }
-  }
-}
-
 // elements that are popover "triggers" (root elements) (e.g. open on right click)-----------------
 td.pf-popover-trigger{
   &:hover{
@@ -1095,7 +1614,7 @@ td.pf-popover-trigger{
   position: relative;
   background-color: $gray-dark;
   overflow: hidden;
-  @include border-radius(5px);
+  border-radius: 5px;
 
   .dl-horizontal{
     margin-bottom: 0;
@@ -1113,21 +1632,79 @@ td.pf-popover-trigger{
   > [class~='alert']:last-of-type{
     margin-bottom: 0;
   }
+
+  &[data-resizebar]{
+    padding-bottom: 15px;
+
+    &:hover{
+      .pf-resizearea{
+        @include transition-delay(.15s);
+        height: 40px;
+        opacity: 1;
+      }
+
+      .pf-resizebar-bar{
+        border-top: 1px solid $orange !important;
+      }
+    }
+  }
+
+  &:not([data-resizebar]){
+    .pf-dynamic-area-resizebar{
+      display: none;
+    }
+  }
+
+  .pf-resizearea{
+    height: 0;
+    opacity: 0;
+    @include transition(height .12s ease-out, opacity .12s ease-out);
+    will-change: height, opacity;
+  }
+
+  .pf-dynamic-area-statusbar{
+    position: absolute;
+    left: 0;
+    bottom: 0;
+    width: 100%;
+    background-color: $gray-dark;
+    padding: 1px 0;
+
+    .pf-dynamic-area-resizebar{
+      width: 100%;
+      height: 9px;
+      padding-top: 1px;
+      cursor: row-resize;
+
+      &:hover{
+        .pf-resizebar-bar{
+          border-top: 1px solid $orange;
+        }
+      }
+
+      .pf-resizebar-bar{
+        border-top: 1px solid $gray-light;
+        transition: border-top 0.15s ease-out;
+        width: 20px;
+        margin: 1px auto;
+      }
+    }
+  }
 }
 
 // code highlighting ==============================================================================
 .pf-code-ObjectBrace {
-  color: $pink-darker;
+  color: lighten($pink-darker, 15%);
   font-weight: bold;
 }
 
 .pf-code-ArrayBrace {
-  color: $purple-dark;
+  color: $teal-lightest;
   font-weight: bold;
 }
 
 .pf-code-PropertyName {
-  color: $gray-darkest;
+  color: lighten($gray-light, 15%);
   font-weight: bold;
 }
 
@@ -1136,38 +1713,62 @@ td.pf-popover-trigger{
 }
 
 .pf-code-Number {
-  color: $green-dark;
+  color: $green;
 }
 
 .pf-code-Boolean {
-  color: $indigo-darkest;
+  color: $indigo;
   font-weight: bold;
 }
 
 .pf-code-Function {
-  color: $pink-darker;
+  color: lighten($gray-light, 15%);
+  font-style: italic;
+  white-space: pre;
 }
 
 .pf-code-Null {
-  color: $gray-darker;
+  color: $red;
   font-weight: bold;
 }
 
 .pf-code-Comma {
-  color: $gray-darkest;
+  color: lighten($gray-light, 15%);
   font-weight: bold;
+}
+
+.pf-code-Date {
+  color: lighten($gray-light, 15%);
+  font-style: italic;
+}
+
+pre {
+  .fa-ul {
+    display: flex;
+    flex-direction: column;
+    margin-left: 15px;
+  }
+
+  > ul {
+    margin-top: 10px;
+  }
 }
 
 code {
   .fas, .far, .fab {
-    color: $gray;
+    color: $gray-light;
     cursor: pointer;
+    margin: 0 3px;
   }
-}
 
-// svg logo =======================================================================================
-#pf-logo-wrapper{
-  display: block; // remove default height
+  section {
+    border-radius: 5px;
+
+    &:not(:last-child) {
+      border-bottom: 1px dashed $gray;
+      padding-bottom: 5px;
+    }
+  }
 }
 
 // header =========================================================================================
@@ -1224,16 +1825,16 @@ code {
 
   }
 
-  .pf-head-user-character, .pf-head-user-ship{
+  .pf-head-user-character{
     opacity: 0; // triggered by js
     visibility: hidden;
   }
 
-  .pf-head-active-user{
+  .pf-head-active-users{
     cursor: pointer;
   }
 
-  .pf-head-active-user, #pf-head-current-location{
+  .pf-head-active-users{
     display: none; // triggered by js
 
     .badge{
@@ -1241,24 +1842,32 @@ code {
     }
   }
 
-  .pf-head-user-character-image, .pf-head-user-ship-image{
+  .pf-head-image{
     display: inline-block;
     margin-top: -6px;
     margin-bottom: -6px;
     width: 27px;
     border: 1px solid $gray;
-    margin-right: 3px;
     image-rendering: -webkit-optimize-contrast;
     @include transition( border-color 0.15s ease-out );
     will-change: border-color;
+
+    &.--left{
+      margin-right: 3px;
+    }
+
+    &.--right{
+      margin-left: 8px;
+    }
   }
 
   .pf-head-program-status{
     cursor: pointer;
   }
 
-  .navbar-text{
-    min-width: 60px; // fixes a load-delay issue for "toggle" map-tracking
+  .pf-head-map-tracking{
+    margin-bottom: 4px;
+    margin-top: 4px;
   }
 
   // tooltips header
@@ -1276,6 +1885,10 @@ code {
   .badge{
     background-color: $gray;
     color: $gray-lighter;
+
+    &:empty{
+      display: none;
+    }
   }
 
   small{
@@ -1283,26 +1896,16 @@ code {
   }
 }
 
-// character switch popover
-#pf-head-character-switch{
-  td{
-    border: none;
-
-    &:first-child + td{
-      // 2nd column
-      padding: 0 5px;
-    }
-  }
-}
-
 // footer (map) ===================================================================================
 #pf-footer{
+  display: flex;
   position: absolute;
   bottom: 0;
   left: 0;
   width: 100%;
   margin: 0;
   background: rgba($gray, 0.3);
+  padding: 1px 0;
 
   a{
     font-family: $font-family-bold;
@@ -1312,6 +1915,24 @@ code {
       color: $teal;
       text-decoration: none;
     }
+  }
+
+  .pf-footer-left{
+    display: flex;
+    flex: none;          // shorthand for: flex-grow: 0, flex-shrink: 0, flex-basis: auto
+    justify-content: flex-start;
+  }
+
+  .pf-footer-center{
+    display: flex;
+    flex: 1;          // shorthand for: flex-grow: 1, flex-shrink: 1, flex-basis: 0
+    padding: 0 20px;
+  }
+
+  .pf-footer-right{
+    display: flex;
+    flex: none;          // shorthand for: flex-grow: 0, flex-shrink: 0, flex-basis: auto
+    justify-content: flex-end;
   }
 }
 
@@ -1325,23 +1946,44 @@ code {
   }
 }
 
-// left menu ======================================================================================
-.pf-menu-clock{
-  position: absolute;
-  bottom: 0;
-  width: 100%;
-  padding: 6px 8px;
-  text-align: center;
+.flex-row {
+  display: flex;
+  flex: 0 1 auto;
+  flex-direction: row;
+  flex-wrap: wrap;
+}
+
+.flex-col {
+  flex: 0 0 auto;
+}
+
+.flex-grow {
+  flex-grow: 1;
+  flex-basis: 0;
+  max-width: 100%;
+}
+
+.flex-between {
+  justify-content: space-between;
 }
 
 // global info panel ==============================================================================
 #pf-global-info{
-  position: absolute;
-  left: 0;
-  bottom: 32px;
   width: 100%;
-  height: 32px;
-  margin-bottom: 0; // overwrite default "alert" style
+  margin-bottom: 0;     // overwrite default "alert" style
+  border: none;
+  padding: 9px 10px;
+
+  .ui-pnotify-icon{
+    float: left;
+
+    > span{
+      display: block;
+    }
+  }
+  .ui-pnotify-title{
+    margin-bottom: 0;   // overwrite default "alert" style
+  }
 }
 
 // reverse order (reverse render order)
@@ -1358,48 +2000,10 @@ code {
   }
 }
 
-// drag&drop (Sortable) ===========================================================================
-.pf-sortable-ghost{
-  will-change: opacity;
-  transition: opacity 0.2s ease-out;
-  opacity: 0.7 !important;
-
-  .pf-module-handler-drag{
-    color: $orange-light;
-    cursor: -moz-grabbing;
-    cursor: -webkit-grabbing;
-    cursor: grabbing;
-  }
-}
-
 /*
 Animate the stripes
 */
-@-webkit-keyframes move{
-  0% {
-    background-position: 0 0;
-  }
-  100% {
-    background-position: 50px 50px;
-  }
-}
-@-moz-keyframes move{
-  0% {
-    background-position: 0 0;
-  }
-  100% {
-    background-position: 50px 50px;
-  }
-}
-@-ms-keyframes move{
-  0% {
-    background-position: 0 0;
-  }
-  100% {
-    background-position: 50px 50px;
-  }
-}
-@keyframes move{
+@-webkit-keyframes move {
   0% {
     background-position: 0 0;
   }
@@ -1408,4 +2012,29 @@ Animate the stripes
   }
 }
 
+@-moz-keyframes move {
+  0% {
+    background-position: 0 0;
+  }
+  100% {
+    background-position: 50px 50px;
+  }
+}
 
+@-ms-keyframes move {
+  0% {
+    background-position: 0 0;
+  }
+  100% {
+    background-position: 50px 50px;
+  }
+}
+
+@keyframes move {
+  0% {
+    background-position: 0 0;
+  }
+  100% {
+    background-position: 50px 50px;
+  }
+}

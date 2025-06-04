@@ -8,17 +8,16 @@ define([
     'app/util',
     'app/render',
     'blueImpGallery',
-    'bootbox',
+    'layout/header_login',
     'lazyload',
-    'app/ui/header',
-    'app/ui/logo',
-    'app/ui/demo_map',
+    'bootbox',
     'dialog/account_settings',
     'dialog/notification',
     'dialog/manual',
     'dialog/changelog',
-    'dialog/credit'
-], ($, Init, Util, Render, Gallery, bootbox) => {
+    'dialog/credit',
+    'dialog/api_status'
+], ($, Init, Util, Render, Gallery, HeaderLogin, LazyLoad, bootbox) => {
 
     'use strict';
 
@@ -28,7 +27,6 @@ define([
         // header
         headerId: 'pf-landing-top',                                             // id for header
         headerContainerId: 'pf-header-container',                               // id for header container
-        logoContainerId: 'pf-logo-container',                                   // id for main header logo container
         headHeaderMapId: 'pf-header-map',                                       // id for header image (svg animation)
 
         // map bg
@@ -70,6 +68,8 @@ define([
         stickyPanelServerId: 'pf-landing-server-panel',                         // id for EVE Online server status panel
         stickyPanelAdminId: 'pf-landing-admin-panel',                           // id for admin login panel
 
+        apiStatusTriggerClass: 'pf-api-status-trigger',                         // class for "api status" dialog trigger elements
+
         // animation
         animateElementClass: 'pf-animate-on-visible',                           // class for elements that will be animated to show
 
@@ -105,6 +105,17 @@ define([
         let ssoButtonElement = $('.' + config.ssoButtonClass);
         let cookieHintElement = $('#' + config.cookieHintId);
 
+        $(document).on('click', '.' + config.characterSelectionClass + ' a', function(){
+            $('.' + config.splashOverlayClass).showSplashOverlay();
+        });
+
+        $(document).on('click', '.' + config.ssoButtonClass , function(){
+            if(Util.getCookie('cookie') === '1'){
+                // ... cookies accepted no "confirm" shown
+                $('.' + config.splashOverlayClass).showSplashOverlay();
+            }
+        });
+
         // cookie hint --------------------------------------------------------
         cookieHintElement.find('.btn-success').on('click', function(){
             setAcceptCookie();
@@ -112,12 +123,12 @@ define([
             ssoButtonElement.confirmation('destroy');
         });
 
-        cookieHintElement.on('show.bs.collapse', function () {
+        cookieHintElement.on('show.bs.collapse', function(){
             // move admin panel upwards (prevents overlapping with cookie notice)
             moveAdminPanel('up');
         });
 
-        cookieHintElement.on('hidden.bs.collapse', function () {
+        cookieHintElement.on('hidden.bs.collapse', function(){
             moveAdminPanel('down');
         });
 
@@ -127,15 +138,14 @@ define([
 
             // show Cookie accept hint on SSO login button
             let confirmationSettings = {
-                container: 'body',
                 placement: 'bottom',
-                btnOkClass: 'btn btn-sm btn-default',
-                btnOkLabel: 'dismiss',
-                btnOkIcon: 'fas fa-fw fa-sign-in-alt',
                 title: 'Accept cookies',
                 btnCancelClass: 'btn btn-sm btn-success',
                 btnCancelLabel: 'accept',
                 btnCancelIcon: 'fas fa-fw fa-check',
+                btnOkClass: 'btn btn-sm btn-default',
+                btnOkLabel: 'dismiss',
+                btnOkIcon: 'fas fa-fw fa-sign-in-alt',
                 onCancel: function(e, target){
                     // "Accept cookies"
                     setAcceptCookie();
@@ -164,7 +174,7 @@ define([
         // license ------------------------------------------------------------
         $('.' + config.navigationLinkLicenseClass).on('click', function(e){
             e.preventDefault();
-            $.fn.showCreditsDialog(false, true);
+            $.fn.showCreditsDialog();
         });
 
         // releases -----------------------------------------------------------
@@ -194,24 +204,10 @@ define([
         }
 
         // extent "blueimp" gallery for a textFactory method to show HTML templates
-        Gallery.prototype.textFactory = function (obj, callback) {
+        Gallery.prototype.textFactory = function(obj, callback){
             let newSlideContent = $('<div>')
                 .addClass('text-content')
                 .attr('imgTitle', obj.title);
-
-            let moduleConfig = {
-                name: obj.href, // template name
-                position: newSlideContent,
-                functions: {
-                    after: function(){
-                        // element inserted -> load complete
-                        callback({
-                            type: 'complete',
-                            target: newSlideContent[0]
-                        });
-                    }
-                }
-            };
 
             // render HTML file (template)
             let moduleData = {
@@ -222,7 +218,9 @@ define([
                 mapBgImageId: config.mapBgImageId
             };
 
-            Render.showModule(moduleConfig, moduleData);
+            Render.render(obj.href, moduleData)
+                .then(payload => newSlideContent.append(payload))
+                .then(payload => callback({type: 'complete', target: payload[0]}));
 
             return newSlideContent[0];
         };
@@ -265,13 +263,14 @@ define([
             titleProperty: 'imgTitle',
             transitionSpeed: 600,
             slideshowInterval: 5000,
-            onopened: function () {
+            preloadRange: 1,
+            onopened: function(){
                 // Callback function executed when the Gallery has been initialized
                 // and the initialization transition has been completed.
                 // -> show "demo" map
 
                 // set title for first slide
-                $( this.options.container ).find(  this.options.titleElement).text('Browser view');
+                $(this.options.container).find(this.options.titleElement).text('Browser view');
 
                 $('#' + config.headHeaderMapId).drawDemoMap(function(){
 
@@ -311,7 +310,6 @@ define([
                         }
                     });
                 });
-
             }
         });
     };
@@ -331,12 +329,12 @@ define([
     let initGallery = (newElements) => {
         if( newElements.length > 0){
             // We have to add ALL thumbnail elements to the gallery!
-            // -> even those wthat are invisible (not lazyLoaded) now!
+            // -> even those which are invisible (not lazyLoaded) now!
             // -> This is required for "swipe" through all images
             let allThumbLinks = getThumbnailElements();
 
             requirejs(['blueImpGalleryBootstrap'], () => {
-                $(newElements).each(function() {
+                $(newElements).each(function(){
                     let borderless = false;
 
                     let galleryElement = $('#' + config.galleryId);
@@ -369,17 +367,17 @@ define([
      */
     let initYoutube = () => {
 
-        $('.youtube').each(function() {
+        $('.youtube').each(function(){
             // Based on the YouTube ID, we can easily find the thumbnail image
             $(this).css('background-image', 'url(//i.ytimg.com/vi/' + this.id + '/sddefault.jpg)');
 
             // Overlay the Play icon to make it look like a video player
             $(this).append($('<div/>', {'class': 'play'}));
 
-            $(document).delegate('#' + this.id, 'click', function() {
+            $(document).delegate('#' + this.id, 'click', function(){
                 // Create an iFrame with autoplay set to true
                 let iFrameUrl = '//www.youtube.com/embed/' + this.id + '?autoplay=1&autohide=1';
-                if ( $(this).data('params') ){
+                if( $(this).data('params') ){
                     iFrameUrl += '&'+$(this).data('params');
                 }
 
@@ -403,13 +401,13 @@ define([
      * init scrollSpy for navigation bar
      */
     let initScrollSpy = () => {
-        // init scrollspy
+        let scrollElement = document;
+        let timeout;
 
         // show elements that are currently in the viewport
         let showVisibleElements = () => {
             // find all elements that should be animated
-            let visibleElements = $('.' + config.animateElementClass).isInViewport();
-
+            let visibleElements = Util.findInViewport($('.' + config.animateElementClass));
             $(visibleElements).removeClass( config.animateElementClass );
 
             $(visibleElements).velocity('transition.flipXIn', {
@@ -428,24 +426,22 @@ define([
             });
         };
 
-        $( window ).scroll(() => {
-            // check for new visible elements
-            showVisibleElements();
-        });
+        let scrollHandler = () => {
+            // If there's a timer, cancel it
+            if(timeout){
+                window.cancelAnimationFrame(timeout);
+            }
+            timeout = window.requestAnimationFrame(showVisibleElements);
+        };
+
+        scrollElement.addEventListener('scroll', scrollHandler, false);
 
         // initial check for visible elements
         showVisibleElements();
 
-        // event listener for navigation links
-        $('.page-scroll').on('click', function(){
-            // get element to scroll
-            let anchorTag = $(this).attr('data-anchor');
 
-            // scroll to container
-            $(anchorTag).velocity('scroll', {
-                duration: 300,
-                easing: 'swing'
-            });
+        Util.initScrollSpy(document.getElementById(config.navigationElementId), scrollElement, {
+            offset: 150
         });
     };
 
@@ -455,35 +451,53 @@ define([
      */
     let initServerStatus = () => {
         $.ajax({
-            type: 'POST',
+            type: 'GET',
             url: Init.path.getServerStatus,
             dataType: 'json'
         }).done(function(responseData, textStatus, request){
 
-            if(responseData.hasOwnProperty('status')){
-                let data = responseData.status;
-                data.stickyPanelServerId = config.stickyPanelServerId;
-                data.stickyPanelClass = config.stickyPanelClass;
+            let dateLastModified = new Date(request.getResponseHeader('Last-Modified') || Date.now());
+            let dateExpires = new Date(request.getResponseHeader('Expires') || Date.now());
 
-                let statusClass = '';
-                switch(data.serviceStatus.toLowerCase()){
-                    case 'online': statusClass = 'txt-color-green'; break;
-                    case 'vip': statusClass = 'txt-color-orange'; break;
-                    case 'offline': statusClass = 'txt-color-redDarker'; break;
+            var options = { hour: '2-digit', minute: '2-digit', hour12: false, timeZone: 'UTC', timeZoneName: 'short' };
+            responseData.api.cache = dateLastModified.toLocaleTimeString('en-US', options);
+            responseData.api.cacheExpire = 'TTL ' + (dateExpires - dateLastModified) / 1000 + 's';
+
+            let data = {
+                stickyPanelServerId: config.stickyPanelServerId,
+                stickyPanelClass: config.stickyPanelClass,
+                apiStatusTriggerClass: config.apiStatusTriggerClass,
+                server: responseData.server,
+                api: responseData.api,
+                statusFormat: () => {
+                    return (val, render) => {
+                        switch(render(val)){
+                            case 'online':
+                            case 'green':   return 'txt-color-green';
+                            case 'vip':
+                            case 'yellow':  return 'txt-color-yellow';
+                            case 'orange':  return 'txt-color-orange';
+                            case 'offline':
+                            case 'red':     return 'txt-color-red';
+                            default:        return '';
+                        }
+                    };
                 }
-                data.serviceStatus = {
-                    eve: data.serviceStatus,
-                    style: statusClass
-                };
+            };
 
-                requirejs(['text!templates/ui/server_panel.html', 'mustache'], function(template, Mustache) {
-                    let content = Mustache.render(template, data);
-                    $('#' + config.headerId).prepend(content);
-                    $('#' + config.stickyPanelServerId).velocity('transition.slideLeftBigIn', {
-                        duration: 240
-                    });
+            requirejs(['text!templates/ui/server_panel.html', 'mustache'], function(template, Mustache){
+                let content = Mustache.render(template, data);
+                $('#' + config.headerId).prepend(content);
+                let stickyPanelServer = $('#' + config.stickyPanelServerId);
+                stickyPanelServer.velocity('transition.slideLeftBigIn', {
+                    duration: 240
                 });
-            }
+
+                // set observer for api status dialog
+                stickyPanelServer.on('click', '.' + config.apiStatusTriggerClass, function(){
+                    $.fn.apiStatusDialog(data.api);
+                });
+            });
 
         }).fail(handleAjaxErrorResponse);
     };
@@ -498,7 +512,7 @@ define([
 
         let showNotificationPanel = () => {
             let data = {
-                version: Util.getVersion()
+                version: currentVersion
             };
 
             requirejs(['text!templates/ui/notice.html', 'mustache'], (template, Mustache) => {
@@ -512,16 +526,16 @@ define([
                         setVersionLinkObserver();
 
                         // mark panel as "shown"
-                        Util.getLocalStorage().setItem(storageKey, currentVersion);
+                        Util.getLocalStore('default').setItem(storageKey, currentVersion);
                     }
                 });
             });
         };
 
-        Util.getLocalStorage().getItem(storageKey).then(function(data){
+        Util.getLocalStore('default').getItem(storageKey).then(data => {
             // check if panel was shown before
             if(data){
-                if(data !== this.version){
+                if(data !== currentVersion){
                     // show current panel
                     showNotificationPanel();
                 }
@@ -529,9 +543,7 @@ define([
                 // show current panel
                 showNotificationPanel();
             }
-        }.bind({
-            version: currentVersion
-        }));
+        });
     };
 
     /**
@@ -579,7 +591,7 @@ define([
          * update all character panels -> set CSS class (e.g. after some panels were added/removed,..)
          */
         let updateCharacterPanels = function(){
-            let characterRows = $('.' + config.characterSelectionClass + ' .pf-dynamic-area').parent();
+            let characterRows = $('.' + config.characterSelectionClass + ' .' + Util.config.dynamicAreaClass).parent();
             let rowClassIdentifier = ((12 / characterRows.length ) <= 3) ? 3 : (12 / characterRows.length);
             $(characterRows).removeClass().addClass('col-sm-' + rowClassIdentifier);
         };
@@ -589,7 +601,7 @@ define([
         let removeCharacterPanel = function(panelElement){
             $(panelElement).velocity('transition.expandOut', {
                 duration: 250,
-                complete: function () {
+                complete: function(){
                     // lock row for CSS animations while removing...
                     $(this).parent().addClass(config.characterRowAnimateClass);
 
@@ -616,6 +628,7 @@ define([
                 case 'UNKNOWN':
                     label = 'ERROR';
                     break;
+                case 'CHARACTER':
                 case 'CORPORATION':
                 case 'ALLIANCE':
                     label = 'INVALID';
@@ -631,7 +644,7 @@ define([
         // request character data for each character panel
         requirejs(['text!templates/ui/character_panel.html', 'mustache'], function(template, Mustache){
 
-            $('.' + config.characterSelectionClass + ' .pf-dynamic-area').each(function(){
+            $('.' + config.characterSelectionClass + ' .' + Util.config.dynamicAreaClass).each(function(){
                 let characterElement = $(this);
 
                 characterElement.showLoadingAnimation();
@@ -671,6 +684,7 @@ define([
                             link: this.characterElement.data('href'),
                             cookieName: this.cookieName,
                             browserTabId: this.browserTabId,
+                            ccpImageServer: responseData.ccpImageServer,
                             character: responseData.character,
                             isManager: Util.getObjVal(responseData, 'character.role.name') === 'CORPORATION',
                             isAdmin: Util.getObjVal(responseData, 'character.role.name') === 'SUPER',
@@ -682,18 +696,13 @@ define([
                         let content = Mustache.render(template, data);
                         this.characterElement.html(content);
 
-                        // lock character selection on click (prevent click spamming)
-                        this.characterElement.find('a').on('click', function(){
-                            $('.' + config.splashOverlayClass).showSplashOverlay();
-                        });
-
                         // show character panel (animation settings)
                         initCharacterAnimation(this.characterElement.find('.' + config.characterImageWrapperClass));
                     }else{
                         // character data not available -> remove panel
                         removeCharacterPanel(this.characterElement);
                     }
-                }).fail(function( jqXHR, status, error) {
+                }).fail(function(jqXHR, status, error){
                     let characterElement = this.characterElement;
                     characterElement.hideLoadingAnimation();
 
@@ -742,6 +751,9 @@ define([
      * main init "landing" page
      */
     $(() => {
+        // passive event listener
+        Util.initPassiveEvents();
+
         // clear sessionStorage
         Util.clearSessionStorage();
 
@@ -755,33 +767,43 @@ define([
         Util.showVersionInfo();
 
         // show log off message
-        let isLogOut = location.search.split('logout')[1];
-        if(isLogOut !== undefined){
+        let searchParams = new URLSearchParams(location.search); // jshint ignore:line
+        if(
+            searchParams.has('logout') ||
+            searchParams.has('logoutGraceful')
+        ){
+            let cls = 'txt-color-warning';
+            let text = [
+                'For security reasons, you were logged out automatically',
+                'Please log in again'
+            ];
+
+            if(searchParams.has('logoutGraceful')){
+                cls = 'txt-color-success';
+                text = ['You have successfully logged out'];
+            }
 
             // show logout dialog
             let options = {
                 buttons: {
                     close: {
                         label: 'close',
-                        className: ['btn-default'].join(' ')
+                        className: 'btn-default'
                     }
                 },
                 content: {
                     icon: 'fa-sign-out-alt',
-                    class: 'txt-color-warning',
+                    class: cls,
                     title: 'Logout',
                     headline: 'Logout',
-                    text: [
-                        'For security reasons, you were logged out automatically',
-                        'Please log in again'
-                    ]
+                    text: text
                 }
             };
 
             $.fn.showNotificationDialog(options);
 
             // change url (remove logout parameter)
-            if (history.pushState) {
+            if(history.pushState){
                 history.pushState({}, '', location.protocol + '//' + location.host + location.pathname);
             }
         }
@@ -793,12 +815,13 @@ define([
         });
 
         // init "lazy loading" for images
-        $('.' + config.galleryThumbImageClass).lazyload({
-            threshold : 300
+        let lazyLoadInstance = new LazyLoad({
+            elements_selector: `.${config.galleryThumbImageClass}`,
+            use_native: true
         });
 
         // hide splash loading animation
-        $('.' + config.splashOverlayClass).hideSplashOverlay();
+        $('.' + config.splashOverlayClass + '[data-status="ok"]').hideSplashOverlay();
 
         // init server status information
         initServerStatus();
@@ -815,7 +838,7 @@ define([
         // init carousel
         initCarousel();
 
-        // init scrollspy
+        // init scrollSpy
         // -> after "Carousel"! required for correct "viewport" calculation (Gallery)!
         initScrollSpy();
 
@@ -823,13 +846,8 @@ define([
         initYoutube();
 
         // draw header logo
-        $('#' + config.logoContainerId).drawLogo(() => {
-            // init header animation
-            $('#' + config.headerContainerId).initHeader(() => {
-
-            });
-        }, false);
-
+        document.querySelector(`.logo-ploygon-top-right`).addEventListener('animationend', () => {
+            HeaderLogin.init(document.getElementById(config.headerContainerId));
+        });
     });
-
 });

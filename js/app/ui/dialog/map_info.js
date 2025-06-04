@@ -7,9 +7,10 @@ define([
     'app/init',
     'app/util',
     'app/render',
+    'app/counter',
     'bootbox',
     'app/map/util'
-], function($, Init, Util, Render, bootbox, MapUtil) {
+], ($, Init, Util, Render, Counter, bootbox, MapUtil) => {
 
     'use strict';
 
@@ -31,8 +32,10 @@ define([
         mapInfoLogsId: 'pf-map-info-logs',                                      // id for map info logs box
 
         mapInfoLifetimeCounterClass: 'pf-map-info-lifetime-counter',            // class for map lifetime counter
+        systemInfoPlanetsClass: 'pf-system-info-planets',                       // class for "planets" information element
 
         // dataTable
+        tableId: 'pf-info-table-',                                              // Table id prefix
         tableToolsClass: 'pf-table-tools',                                      // class for table "tools" section (e.g. Buttons)
         tableCellImageClass: 'pf-table-image-cell',                             // class for table "image" cells
         tableCellImageSmallClass: 'pf-table-image-small-cell',                  // class for table "small image" cells
@@ -51,18 +54,6 @@ define([
                 size: 'fa-2x'
             }
         }
-    };
-
-    // confirmation dialog settings (e.g. delete row)
-    let confirmationSettings = {
-        container: 'body',
-        placement: 'left',
-        btnCancelClass: 'btn btn-sm btn-default',
-        btnCancelLabel: 'cancel',
-        btnCancelIcon: 'fas fa-fw fa-ban',
-        btnOkClass: 'btn btn-sm btn-danger',
-        btnOkLabel: 'delete',
-        btnOkIcon: 'fas fa-fw fa-times'
     };
 
     /**
@@ -92,99 +83,6 @@ define([
     };
 
     /**
-     * write clipboard text
-     * @param text
-     * @returns {Promise<any>}
-     */
-    let copyToClipboard = (text) => {
-
-        let copyToClipboardExecutor = (resolve, reject) => {
-            let payload = {
-                action: 'copyToClipboard',
-                data: false
-            };
-
-            if (navigator.clipboard) {
-                // get current permission status
-                navigator.permissions.query({
-                    name: 'clipboard-write'
-                }).then(permissionStatus => {
-                    // will be 'granted', 'denied' or 'prompt'
-                    if(
-                        permissionStatus.state === 'granted' ||
-                        permissionStatus.state === 'prompt'
-                    ){
-                        navigator.clipboard.writeText(text)
-                            .then(() => {
-                                payload.data = true;
-                                resolve(payload);                        })
-                            .catch(err => {
-                                let errorMsg = 'Failed to write clipboard content';
-                                console.error(errorMsg, err);
-                                Util.showNotify({title: 'Clipboard API', text: errorMsg, type: 'error'});
-                                resolve(payload);
-                            });
-                    }else{
-                        Util.showNotify({title: 'Clipboard API', text: 'You denied write access', type: 'warning'});
-                        resolve(payload);
-                    }
-                });
-            } else {
-                console.warn('Clipboard API not supported by your browser');
-                resolve(payload);
-            }
-        };
-
-        return new Promise(copyToClipboardExecutor);
-    };
-
-    /**
-     * read clipboard text
-     * @returns {Promise<any>}
-     */
-    let readFromClipboard = () => {
-
-        let readFromClipboardExecutor = (resolve, reject) => {
-            let payload = {
-                action: 'readFromClipboard',
-                data: false
-            };
-
-            if (navigator.clipboard) {
-                // get current permission status
-                navigator.permissions.query({
-                    name: 'clipboard-read'
-                }).then(permissionStatus => {
-                    // will be 'granted', 'denied' or 'prompt'
-                    if(
-                        permissionStatus.state === 'granted' ||
-                        permissionStatus.state === 'prompt'
-                    ){
-                        navigator.clipboard.readText()
-                            .then(text => {
-                                payload.data = text;
-                                resolve(payload);                        })
-                            .catch(err => {
-                                let errorMsg = 'Failed to read clipboard content';
-                                console.error(errorMsg, err);
-                                Util.showNotify({title: 'Clipboard API', text: errorMsg, type: 'error'});
-                                resolve(payload);
-                            });
-                    }else{
-                        Util.showNotify({title: 'Clipboard API', text: 'You denied read access', type: 'warning'});
-                        resolve(payload);
-                    }
-                });
-            } else {
-                console.warn('Clipboard API not supported by your browser');
-                resolve(payload);
-            }
-        };
-
-        return new Promise(readFromClipboardExecutor);
-    };
-
-    /**
      * loads the map info data into an element
      * @param mapData
      */
@@ -201,14 +99,7 @@ define([
 
         // map type
         let mapTypes = MapUtil.getMapTypes();
-        let mapType = null;
-
-        for(let i = 0; i < mapTypes.length; i++){
-            if(mapTypes[i].id === mapData.config.type.id){
-                mapType = mapTypes[i];
-                break;
-            }
-        }
+        let mapType = mapTypes.find(data => data.id === mapData.config.type.id);
 
         // check max map limits (e.g. max systems per map) ------------------------------------------------------------
         let percentageSystems = (100 / mapType.defaultConfig.max_systems) * countSystems;
@@ -284,19 +175,19 @@ define([
         mapElement.append(dlElementRight);
 
         // init map lifetime counter
-        $('.' + config.mapInfoLifetimeCounterClass).initTimestampCounter();
+        Counter.initTimestampCounter($('.' + config.mapInfoLifetimeCounterClass));
 
         mapElement.find('.' + config.textActionIconCopyClass).on('click', function(){
            let mapUrl = $(this).find('span').text().trim();
-            copyToClipboard(mapUrl).then(payload => {
+            Util.copyToClipboard(mapUrl).then(payload => {
                 if(payload.data){
-                    Util.showNotify({title: 'Copied to clipbaord', text: mapUrl, type: 'success'});
+                    Util.showNotify({title: 'Copied to clipboard', text: mapUrl, type: 'success'});
                 }
             });
         });
 
-        mapElement.initTooltips();
         mapElement.hideLoadingAnimation();
+        mapElement.initTooltips({container: '.modal'});
     };
 
     /**
@@ -304,326 +195,317 @@ define([
      * @param mapData
      */
     $.fn.initSystemInfoTable = function(mapData){
-        let systemsElement = $(this).empty();
+        let tableApi = Util.getDataTableInstance(config.tableId, mapData.config.id, '', 'systems');
 
-        let systemTable = $('<table>', {
-            class: ['compact', 'stripe', 'order-column', 'row-border'].join(' ')
-        });
-        systemsElement.append(systemTable);
+        if(tableApi){
+            tableApi.clear();
+            tableApi.rows.add(mapData.data.systems);
+            tableApi.draw();
+        }else{
+            let systemsElement = $(this);
 
-        systemsElement.showLoadingAnimation(config.loadingOptions);
+            let systemTable = $('<table>', {
+                id: Util.getTableId(config.tableId, 'systems', mapData.config.id),
+                class: ['compact', 'stripe', 'order-column', 'row-border'].join(' ')
+            });
+            systemsElement.append(systemTable);
 
-        systemTable.on( 'init.dt', function () {
-            systemsElement.hideLoadingAnimation();
+            systemsElement.showLoadingAnimation(config.loadingOptions);
 
-            // init table tooltips
-            let tooltipElements = systemsElement.find('[data-toggle="tooltip"]');
-            tooltipElements.tooltip();
-        });
-
-        systemTable.on('destroy.dt', function(){
-            $(this).destroyTimestampCounter();
-        });
-
-        // prepare data for dataTables
-        let systemsData = [];
-        for(let i = 0; i < mapData.data.systems.length; i++){
-            let tempSystemData = mapData.data.systems[i];
-
-            let tempData = {};
-
-            // system id
-            tempData.id = tempSystemData.id;
-
-            // current position
-            if(tempSystemData.currentUser === true){
-                tempData.position = {
-                    position: '<i class="fas fa-map-marker-alt fa-lg fa-fw"></i>',
-                    position_sort: 1
-                };
-            }else{
-                tempData.position = {
-                    position: '',
-                    position_sort: 0
-                };
-            }
-
-            // active pilots
-            if(tempSystemData.userCount > 0){
-                tempData.userCount = tempSystemData.userCount;
-            }else{
-                tempData.userCount = '';
-            }
-
-            // type
-            tempData.type = {
-                type: MapUtil.getSystemTypeInfo(tempSystemData.type.id, 'name'),
-                type_sort: tempSystemData.type.id
-            };
-
-            // security
-            let securityClass = Util.getSecurityClassForSystem(tempSystemData.security);
-            tempData.security = {
-                security: '<span class="' + securityClass + '">' + tempSystemData.security + '</span>',
-                security_sort: tempSystemData.security
-            };
-
-            // name
-            tempData.name = tempSystemData.name;
-
-            // alias
-            tempData.alias = (tempSystemData.alias === tempSystemData.name) ? '' : tempSystemData.alias;
-
-            // region
-            tempData.region = tempSystemData.region.name;
-
-            // static
-            let statics = [];
-            for(let j = 0; j < tempSystemData.statics.length; j++){
-                let security = tempSystemData.statics[j].security;
-                let secClass = Util.getSecurityClassForSystem(security);
-                statics.push('<span class="' + secClass + '">' + security + '</span>');
-            }
-            tempData.static = statics.join('&nbsp;&nbsp;');
-
-            // status
-            let systemStatusClass = Util.getStatusInfoForSystem(tempSystemData.status.id, 'class');
-            if(systemStatusClass !== ''){
-                tempData.status = {
-                    status: '<i class="far fa-square fa-lg fa-fw ' + systemStatusClass + '"></i>',
-                    status_sort: tempSystemData.status.id
-                };
-            }else{
-                tempData.status = {
-                    status: '',
-                    status_sort: tempSystemData.status.id
-                };
-            }
-
-            // effect
-            let systemEffectClass = MapUtil.getEffectInfoForSystem(tempSystemData.effect, 'class');
-            if(systemEffectClass !== ''){
-                tempData.effect = {
-                    effect: '<i class="fas fa-square fa-lg fa-fw ' + systemEffectClass + '"></i>',
-                    effect_sort: tempSystemData.effect
-                };
-            }else{
-                tempData.effect = {
-                    effect: '',
-                    effect_sort: ''
-                };
-            }
-
-            // trueSec
-            let systemTrueSecClass = Util.getTrueSecClassForSystem(tempSystemData.trueSec);
-            if(systemTrueSecClass !== ''){
-                tempData.trueSec = {
-                    trueSec: '<span class="' + systemTrueSecClass + '">' + tempSystemData.trueSec.toFixed(1) + '</span>',
-                    trueSec_sort: tempSystemData.trueSec
-                };
-            }else{
-                tempData.trueSec = {
-                    trueSec: '',
-                    trueSec_sort: tempSystemData.trueSec
-                };
-            }
-
-            // locked
-            if(tempSystemData.locked === 1){
-                tempData.locked = {
-                    locked: '<i class="fas fa-lock fa-lg fa-fw"></i>',
-                    locked_sort: tempSystemData.locked
-                };
-            }else{
-                tempData.locked = {
-                    locked: '',
-                    locked_sort: 0
-                };
-            }
-
-            // updated
-            tempData.updated = tempSystemData.updated.updated;
-
-            // delete row
-            tempData.clear = '<i class="fas fa-times txt-color txt-color-redDarker"></i>';
-
-            systemsData.push(tempData);
-        }
-
-        let systemsDataTable = systemTable.DataTable( {
-            pageLength: 20,
-            paging: true,
-            lengthMenu: [[5, 10, 20, 50, -1], [5, 10, 20, 50, 'All']],
-            ordering: true,
-            order: [[ 9, 'desc' ], [ 3, 'asc' ]],
-            autoWidth: false,
-            responsive: {
-                breakpoints: Init.breakpoints,
-                details: false
-            },
-            hover: false,
-            data: systemsData,
-            columnDefs: [],
-            language: {
-                emptyTable:  'Map is empty',
-                zeroRecords: 'No systems found',
-                lengthMenu:  'Show _MENU_ systems',
-                info:        'Showing _START_ to _END_ of _TOTAL_ systems'
-            },
-            columns: [
-                {
-                    title: 'type',
-                    width: '25px',
-                    className: ['min-desktop'].join(' '),
-                    data: 'type',
-                    render: {
-                        _: 'type',
-                        sort: 'type_sort'
-                    }
-                },{
-                    title: '',
-                    width: '1px',
-                    searchable: false,
-                    data: 'security',
-                    render: {
-                        _: 'security',
-                        sort: 'security_sort'
-                    }
-                },{
-                    title: 'sec',
-                    width: '18px',
-                    className: ['text-center', 'min-desktop'].join(' '),
-                    searchable: false,
-                    data: 'trueSec',
-                    render: {
-                        _: 'trueSec',
-                        sort: 'trueSec_sort'
-                    }
-                },{
-                    title: 'system',
-                    data: 'name',
-                    className: [config.tableCellLinkClass].join(' '),
-                    createdCell: function(cell, cellData, rowData, rowIndex, colIndex){
-                        // select system
-                        $(cell).on('click', function(e){
-                            Util.getMapModule().getActiveMap().triggerMenuEvent('SelectSystem', {systemId: rowData.id });
-                        });
-                    }
-                },{
-                    title: 'alias',
-                    data: 'alias'
-                },{
-                    title: 'region',
-                    data: 'region'
-                },{
-                    title: '<i class="far fa-square" title="system&nbsp;status" data-toggle="tooltip"></i>',
-                    width: '12px',
-                    searchable: false,
-                    data: 'status',
-                    render: {
-                        _: 'status',
-                        sort: 'status_sort'
-                    }
-                },{
-                    title: '<i class="fas fa-square" title="system&nbsp;effect" data-toggle="tooltip"></i>',
-                    width: '12px',
-                    className: 'text-center',
-                    searchable: false,
-                    data: 'effect',
-                    render: {
-                        _: 'effect',
-                        sort: 'effect_sort'
-                    }
-                },{
-                    title: 'static',
-                    width: '30px',
-                    data: 'static'
-                },{
-                    title: '<i class="fas fa-map-marker-alt" title="your&nbsp;position" data-toggle="tooltip"></i>',
-                    width: '8px',
-                    searchable: false,
-                    data: 'position',
-                    render: {
-                        _: 'position',
-                        sort: 'position_sort'
-                    }
-                },{
-                    title: '<i class="fas fa-plane" title="active&nbsp;pilots" data-toggle="tooltip"></i>',
-                    width: '12px',
-                    className: 'text-center',
-                    searchable: false,
-                    data: 'userCount'
-                },{
-                    title: '<i class="fas fa-lock" title="system&nbsp;locked" data-toggle="tooltip"></i>',
-                    width: '10px',
-                    searchable: false,
-                    data: 'locked',
-                    render: {
-                        _: 'locked',
-                        sort: 'locked_sort'
-                    }
-                },{
-                    title: 'updated',
-                    width: '80px',
-                    searchable: false,
-                    className: ['text-right', config.tableCellCounterClass, 'min-desktop'].join(' '),
-                    data: 'updated',
-                    createdCell: function(cell, cellData, rowData, rowIndex, colIndex){
-                        $(cell).initTimestampCounter();
-                    }
-                },{
-                    title: '',
-                    orderable: false,
-                    searchable: false,
-                    width: '10px',
-                    className: ['text-center', config.tableCellActionClass].join(' '),
-                    data: 'clear',
-                    createdCell: function(cell, cellData, rowData, rowIndex, colIndex) {
-                        let tempTableElement = this;
-
-                        let tempConfirmationSettings = confirmationSettings;
-                        tempConfirmationSettings.title = 'Delete system';
-                        tempConfirmationSettings.onConfirm = function(e, target){
-                            let deleteRowElement = $(target).parents('tr');
-
-                            let activeMap = Util.getMapModule().getActiveMap();
-                            let systemElement = $('#' + MapUtil.getSystemId(mapData.config.id, rowData.id) );
-
-                            if(systemElement.length){
-                                // trigger system delete event
-                                activeMap.trigger('pf:deleteSystems', [{
-                                    systems: [systemElement[0]],
-                                    callback: function(deletedSystems){
-                                        // callback function after ajax "delete" success
-                                        // check if system was deleted
-                                        if(deletedSystems.length === 1){
-                                            // remove table row
-                                            tempTableElement.DataTable().rows(deleteRowElement).remove().draw();
-
-                                            Util.showNotify({title: 'System deleted', text: rowData.name, type: 'success'});
-
-                                            // refresh connection table (connections might have changed) --------------
-                                            let connectionsElement = $('#' + config.mapInfoConnectionsId);
-                                            let mapDataNew = activeMap.getMapDataFromClient({forceData: true});
-
-                                            connectionsElement.initConnectionInfoTable(mapDataNew);
-                                        }else{
-                                            // error
-                                            Util.showNotify({title: 'Failed to delete system', text: rowData.name, type: 'error'});
-                                        }
-                                    }
-                                }]);
+            let systemsDataTable = systemTable.DataTable({
+                pageLength: 20,
+                paging: true,
+                lengthMenu: [[5, 10, 20, 50, -1], [5, 10, 20, 50, 'All']],
+                ordering: true,
+                order: [15, 'desc'],
+                hover: false,
+                data: mapData.data.systems,
+                columnDefs: [],
+                language: {
+                    emptyTable:  'Map is empty',
+                    zeroRecords: 'No systems found',
+                    lengthMenu:  'Show _MENU_ systems',
+                    info:        'Showing _START_ to _END_ of _TOTAL_ systems'
+                },
+                columns: [
+                    {
+                        name: 'type',
+                        title: 'type',
+                        width: 25,
+                        className: ['min-screen-l'].join(' '),
+                        data: 'type',
+                        render: {
+                            _: (cellData, type, rowData, meta) => {
+                                return MapUtil.getSystemTypeInfo(cellData.id, 'name');
                             }
-                        };
+                        }
+                    },{
+                        name: 'security',
+                        title: '',
+                        width: 1,
+                        data: 'security',
+                        render: {
+                            display: (cellData, type, rowData, meta) => {
+                                let securityClass = Util.getSecurityClassForSystem(cellData);
+                                return '<span class="' + securityClass + '">' + cellData + '</span>';
+                            }
+                        }
+                    },{
+                        name: 'trueSec',
+                        title: 'sec',
+                        width: 18,
+                        className: ['text-center', 'min-screen-l'].join(' '),
+                        searchable: false,
+                        data: 'trueSec',
+                        render: {
+                            display: (cellData, type, rowData, meta) => {
+                                let systemTrueSecClass = Util.getTrueSecClassForSystem(cellData);
+                                return '<span class="' + systemTrueSecClass + '">' + cellData.toFixed(1) + '</span>';
+                            }
+                        }
+                    },{
+                        name: 'shattered',
+                        title: '<i class="fas fa-chart-pie" title="shattered" data-toggle="tooltip"></i>',
+                        width: 10,
+                        className: ['text-center', 'min-screen-l'].join(' '),
+                        searchable: false,
+                        data: 'shattered',
+                        render: {
+                            display: (cellData, type, rowData, meta) => {
+                                let value = '';
+                                if(cellData){
+                                    value = '<i class="fas fa-chart-pie fa-fw ' + Util.getSecurityClassForSystem('SH') + '"></i>';
+                                }
+                                return value;
+                            }
+                        }
+                    },{
+                        name: 'name',
+                        title: 'system',
+                        data: 'name',
+                        className: [config.tableCellLinkClass].join(' '),
+                        createdCell: function(cell, cellData, rowData, rowIndex, colIndex){
+                            // select system
+                            $(cell).on('click', function(e){
+                                Util.triggerMenuAction(Util.getMapModule().getActiveMap(), 'SelectSystem', {systemId: rowData.id});
+                            });
+                        }
+                    },{
+                        name: 'alias',
+                        title: 'alias',
+                        data: 'alias',
+                        render: {
+                            _: (cellData, type, rowData, meta) => {
+                                return (cellData === rowData.name) ? '' : cellData;
+                            }
+                        }
+                    },{
+                        name: 'region',
+                        title: 'region',
+                        data: 'region.name',
+                        className: 'min-screen-l',
+                    },{
+                        name: 'sovereignty',
+                        title: 'sov.',
+                        width: 30,
+                        className: 'text-center',
+                        data: 'sovereignty.alliance.ticker',
+                        defaultContent: '',
+                        render: {
+                            display: (cellData, type, rowData, meta) => {
+                                let value = '';
+                                if(cellData){
+                                    value = '&lt;' + cellData + '&gt;';
+                                }
+                                return value;
+                            }
+                        }
+                    },{
+                        name: 'planets',
+                        title: '<i class="fas fa-circle" title="planets" data-toggle="tooltip"></i>',
+                        width: 10,
+                        className: ['text-right', config.systemInfoPlanetsClass, Util.config.helpDefaultClass, Util.config.popoverTriggerClass].join(' '),
+                        searchable: false,
+                        orderSequence: ['desc', 'asc'],
+                        data: 'planets',
+                        render: {
+                            _: (cellData, type, rowData, meta) => {
+                                return cellData.length;
+                            }
+                        }
+                    },{
+                        name: 'status',
+                        title: '<i class="far fa-square" title="system&nbsp;status" data-toggle="tooltip"></i>',
+                        width: 10,
+                        className: 'text-center',
+                        searchable: false,
+                        data: 'status.id',
+                        render: {
+                            display: (cellData, type, rowData, meta) => {
+                                let value = '';
+                                let systemStatusClass = Util.getStatusInfoForSystem(cellData, 'class');
+                                if(systemStatusClass !== ''){
+                                    value = '<i class="far fa-square fa-fw ' + systemStatusClass + '"></i>';
+                                }
+                                return value;
+                            }
+                        }
+                    },{
+                        name: 'effect',
+                        title: '<i class="fas fa-square" title="system&nbsp;effect" data-toggle="tooltip"></i>',
+                        width: 10,
+                        className: 'text-center',
+                        searchable: false,
+                        data: 'effect',
+                        render: {
+                            display: (cellData, type, rowData, meta) => {
+                                let value = '';
+                                let systemEffectClass = MapUtil.getEffectInfoForSystem(cellData, 'class');
+                                if(systemEffectClass !== ''){
+                                    value = '<i class="fas fa-square fa-fw ' + systemEffectClass + '"></i>';
+                                }
+                                return value;
+                            }
+                        }
+                    },{
+                        name: 'statics',
+                        title: 'statics',
+                        width: 30,
+                        searchable: false,
+                        data: 'statics',
+                        render: {
+                            _: (cellData, type, rowData, meta) => {
+                                let statics = [];
+                                for(let wormholeName of cellData){
+                                    let wormholeData = Object.assign({}, Init.wormholes[wormholeName]);
+                                    statics.push('<span class="' + wormholeData.class + '">' + wormholeData.security + '</span>');
+                                }
+                                return statics.join('&nbsp;&nbsp;');
+                            }
+                        }
+                    },{
+                        name: 'position',
+                        title: '<i class="fas fa-map-marker-alt" title="your&nbsp;position" data-toggle="tooltip"></i>',
+                        width: 8,
+                        className: 'text-center',
+                        searchable: false,
+                        data: 'currentUser',
+                        defaultContent: false,
+                        render: {
+                            display: (cellData, type, rowData, meta) => {
+                                let value = '';
+                                if(cellData === true){
+                                    value = '<i class="fas fa-map-marker-alt fa-fw"></i>';
+                                }
+                                return value;
+                            }
+                        }
+                    },{
+                        name: 'userCount',
+                        title: '<i class="fas fa-plane" title="active&nbsp;pilots" data-toggle="tooltip"></i>',
+                        width: 12,
+                        className: 'text-center',
+                        searchable: false,
+                        data: 'userCount',
+                        render: {
+                            display: (cellData, type, rowData, meta) => {
+                                let value = '';
+                                if(cellData > 0){
+                                    value = cellData;
+                                }
+                                return value;
+                            }
+                        }
+                    },{
+                        name: 'locked',
+                        title: '<i class="fas fa-lock" title="system&nbsp;locked" data-toggle="tooltip"></i>',
+                        width: 10,
+                        className: 'text-center',
+                        searchable: false,
+                        data: 'locked',
+                        render: {
+                            display: (cellData, type, rowData, meta) => {
+                                let value = '';
+                                if(cellData === 1){
+                                    value = '<i class="fas fa-lock fa-fw"></i>';
+                                }
+                                return value;
+                            }
+                        }
+                    },{
+                        name: 'updated',
+                        title: 'updated',
+                        width: 80,
+                        searchable: false,
+                        className: ['text-right', config.tableCellCounterClass].join(' '),
+                        data: 'updated.updated',
+                        defaultContent: '',
+                    },{
+                        name: 'action',
+                        title: '',
+                        orderable: false,
+                        searchable: false,
+                        width: 10,
+                        className: ['text-center', config.tableCellActionClass].join(' '),
+                        data: null,
+                        defaultContent: '<i class="fas fa-times txt-color txt-color-redDark"></i>',
+                        createdCell: function(cell, cellData, rowData, rowIndex, colIndex){
+                            let tempTableElement = this;
 
-                        // init confirmation dialog
-                        $(cell).confirmation(tempConfirmationSettings);
+                            let confirmationSettings = {
+                                placement: 'left',
+                                title: '---',
+                                template: Util.getConfirmationTemplate(null, {
+                                    size: 'small',
+                                    noTitle: true
+                                }),
+                                onConfirm: function(e, target){
+                                    let deleteRowElement = $(target).parents('tr');
 
+                                    let activeMap = Util.getMapModule().getActiveMap();
+                                    let systemElement = $('#' + MapUtil.getSystemId(mapData.config.id, rowData.id) );
+
+                                    if(systemElement.length){
+                                        // trigger system delete event
+                                        activeMap.trigger('pf:deleteSystems', [{
+                                            systems: [systemElement[0]],
+                                            callback: function(deletedSystems){
+                                                // callback function after ajax "delete" success
+                                                // check if system was deleted
+                                                if(deletedSystems.length === 1){
+                                                    // remove table row
+                                                    tempTableElement.DataTable().rows(deleteRowElement).remove().draw();
+
+                                                    Util.showNotify({title: 'System deleted', text: rowData.name, type: 'success'});
+
+                                                    // refresh connection table (connections might have changed) --------------
+                                                    let connectionsElement = $('#' + config.mapInfoConnectionsId);
+                                                    let mapDataNew = activeMap.getMapDataFromClient(['hasId']);
+
+                                                    connectionsElement.initConnectionInfoTable(mapDataNew);
+                                                }else{
+                                                    // error
+                                                    Util.showNotify({title: 'Failed to delete system', text: rowData.name, type: 'error'});
+                                                }
+                                            }
+                                        }]);
+                                    }
+                                }
+                            };
+
+                            // init confirmation dialog
+                            $(cell).confirmation(confirmationSettings);
+                        }
                     }
-                }
-            ]
-        });
+                ],
+                initComplete: function(settings){
+                    systemsElement.hideLoadingAnimation();
+                    systemsElement.initTooltips({container: '.modal'});
 
+                    Counter.initTableCounter(this, ['updated:name']);
+                }
+            });
+        }
     };
 
     /**
@@ -631,160 +513,180 @@ define([
      * @param mapData
      */
     $.fn.initConnectionInfoTable = function(mapData){
-        let connectionsElement = $(this).empty();
+        let tableApi = Util.getDataTableInstance(config.tableId, mapData.config.id, '', 'connections');
 
-        let connectionTable = $('<table>', {
-            class: ['compact', 'stripe', 'order-column', 'row-border'].join(' ')
-        });
-        connectionsElement.append(connectionTable);
+        if(tableApi){
+            tableApi.clear();
+            tableApi.rows.add(mapData.data.connections);
+            tableApi.draw();
+        }else{
+            let connectionsElement = $(this);
 
-        connectionsElement.showLoadingAnimation(config.loadingOptions);
+            let connectionTable = $('<table>', {
+                id: Util.getTableId(config.tableId, 'connections', mapData.config.id),
+                class: ['compact', 'stripe', 'order-column', 'row-border'].join(' ')
+            });
+            connectionsElement.append(connectionTable);
 
-        // table init complete
-        connectionTable.on( 'init.dt', function () {
-            connectionsElement.hideLoadingAnimation();
-        });
+            connectionsElement.showLoadingAnimation(config.loadingOptions);
 
-        // connections table ------------------------------------------------------------------------------------------
-
-        // prepare data for dataTables
-        let connectionData = [];
-        for(let j = 0; j < mapData.data.connections.length; j++){
-            let tempConnectionData = mapData.data.connections[j];
-
-            let tempConData = {};
-
-            tempConData.id = tempConnectionData.id;
-
-            tempConData.scope = {
-                scope: MapUtil.getScopeInfoForConnection(tempConnectionData.scope, 'label'),
-                scope_sort: tempConnectionData.scope
-            };
-
-            tempConData.source = {
-                id: tempConnectionData.source,
-                name: tempConnectionData.sourceName,
-            };
-
-            // connection
-            let connectionClasses = MapUtil.getConnectionFakeClassesByTypes(tempConnectionData.type);
-            connectionClasses = connectionClasses.join(' ');
-            tempConData.connection = '<div class="pf-fake-connection ' + connectionClasses + '"></div>';
-
-            tempConData.target = {
-                id: tempConnectionData.target,
-                name: tempConnectionData.targetName,
-            };
-
-            tempConData.updated = tempConnectionData.updated;
-
-            tempConData.clear = '<i class="fas fa-times txt-color txt-color-redDarker"></i>';
-
-            connectionData.push(tempConData);
-        }
-
-        let connectionDataTable = connectionTable.dataTable( {
-            pageLength: 20,
-            paging: true,
-            lengthMenu: [[5, 10, 20, 50, -1], [5, 10, 20, 50, 'All']],
-            ordering: true,
-            order: [ 0, 'desc' ],
-            autoWidth: false,
-            hover: false,
-            data: connectionData,
-            columnDefs: [],
-            language: {
-                emptyTable:  'No connections',
-                zeroRecords: 'No connections found',
-                lengthMenu:  'Show _MENU_ connections',
-                info:        'Showing _START_ to _END_ of _TOTAL_ connections'
-            },
-            columns: [
-                {
-                    title: 'scope',
-                    width: '50px',
-                    orderable: true,
-                    data: 'scope',
-                    render: {
-                        _: 'scope',
-                        sort: 'scope_sort'
-                    }
-                },{
-                    title: 'source system',
-                    data: 'source.name',
-                    className: [config.tableCellLinkClass].join(' '),
-                    createdCell: function(cell, cellData, rowData, rowIndex, colIndex){
-                        // select system
-                        $(cell).on('click', function(e){
-                            Util.getMapModule().getActiveMap().triggerMenuEvent('SelectSystem', {systemId: rowData.source.id });
-                        });
-                    }
-                },{
-                    title: 'connection',
-                    width: '80px',
-                    className: 'text-center',
-                    orderable: false,
-                    searchable: false,
-                    data: 'connection'
-                }, {
-                    title: 'target system',
-                    data: 'target.name',
-                    className: [config.tableCellLinkClass].join(' '),
-                    createdCell: function(cell, cellData, rowData, rowIndex, colIndex){
-                        // select system
-                        $(cell).on('click', function(e){
-                            Util.getMapModule().getActiveMap().triggerMenuEvent('SelectSystem', {systemId: rowData.target.id });
-                        });
-                    }
-                },{
-                    title: 'updated',
-                    width: '80px',
-                    searchable: false,
-                    className: ['text-right', config.tableCellCounterClass].join(' '),
-                    data: 'updated',
-                    createdCell: function(cell, cellData, rowData, rowIndex, colIndex){
-                        $(cell).initTimestampCounter();
-
-                        if(rowData.scope.scope_sort === 'wh'){
-                            // highlight cell
-                            let diff = new Date().getTime() - cellData * 1000;
-                            let dateDiff = new Date(diff);
-                            if(dateDiff.getUTCDate() > 1){
-                                $(cell).addClass('txt-color txt-color-warning');
+            // connections table ------------------------------------------------------------------------------------------
+            let connectionDataTable = connectionTable.dataTable({
+                pageLength: 20,
+                paging: true,
+                lengthMenu: [[5, 10, 20, 50, -1], [5, 10, 20, 50, 'All']],
+                ordering: true,
+                order: [ 6, 'desc' ],
+                autoWidth: false,
+                hover: false,
+                data: mapData.data.connections,
+                columnDefs: [],
+                language: {
+                    emptyTable:  'No connections',
+                    zeroRecords: 'No connections found',
+                    lengthMenu:  'Show _MENU_ connections',
+                    info:        'Showing _START_ to _END_ of _TOTAL_ connections'
+                },
+                columns: [
+                    {
+                        name: 'scope',
+                        title: 'scope',
+                        width: 50,
+                        orderable: true,
+                        data: 'scope',
+                        render: {
+                            display: (cellData, type, rowData, meta) => {
+                                return MapUtil.getScopeInfoForConnection(cellData, 'label');
                             }
                         }
-                    }
-                },{
-                    title: '',
-                    orderable: false,
-                    searchable: false,
-                    width: '10px',
-                    className: ['text-center', config.tableCellActionClass].join(' '),
-                    data: 'clear',
-                    createdCell: function(cell, cellData, rowData, rowIndex, colIndex) {
-                        let tempTableElement = this;
-
-                        let tempConfirmationSettings = confirmationSettings;
-                        tempConfirmationSettings.title = 'Delete connection';
-                        tempConfirmationSettings.onConfirm = function(e, target){
-                            let deleteRowElement = $(target).parents('tr');
-
-                            // deleteSignatures(row);
-                            let connection = $().getConnectionById(mapData.config.id, rowData.id);
-
-                            $().deleteConnections([connection], function(){
-                                // callback function after ajax "delete" success
-                                // remove table row
-                                tempTableElement.DataTable().rows(deleteRowElement).remove().draw();
+                    },{
+                        name: 'sourceName',
+                        title: 'source system',
+                        data: 'sourceName',
+                        className: [config.tableCellLinkClass].join(' '),
+                        createdCell: function(cell, cellData, rowData, rowIndex, colIndex){
+                            // select system
+                            $(cell).on('click', function(e){
+                                Util.triggerMenuAction(Util.getMapModule().getActiveMap(), 'SelectSystem', {systemId: rowData.source});
                             });
-                        };
+                        }
+                    },{
+                        name: 'sourceBubble',
+                        title: '<i class="fas fa-globe" title="bubbled" data-toggle="tooltip"></i>',
+                        width: 10,
+                        data: 'endpoints.source',
+                        className: 'text-right',
+                        render: {
+                            display: (cellData, type, rowData, meta) => {
+                                let value = '';
+                                if(cellData.types.includes('bubble')){
+                                    value = '<span class="pf-endpoint-bubble"></span>';
+                                }
+                                return value;
+                            }
+                        }
+                    },{
+                        name: 'connection',
+                        title: 'connection',
+                        width: 80,
+                        className: 'text-center',
+                        orderable: false,
+                        searchable: false,
+                        data: 'type',
+                        render: {
+                            display: (cellData, type, rowData, meta) => {
+                                let connectionClasses = MapUtil.getConnectionFakeClassesByTypes(cellData);
+                                connectionClasses = connectionClasses.join(' ');
+                                return  '<div class="' + connectionClasses + '"></div>';
+                            }
+                        }
+                    },{
+                        name: 'targetBubble',
+                        title: '<i class="fas fa-globe" title="bubbled" data-toggle="tooltip"></i>',
+                        width: 10,
+                        data: 'endpoints.target',
+                        className: 'text-left',
+                        render: {
+                            display: (cellData, type, rowData, meta) => {
+                                let value = '';
+                                if(cellData.types.includes('bubble')){
+                                    value = '<span class="pf-endpoint-bubble"></span>';
+                                }
+                                return value;
+                            }
+                        }
+                    },{
+                        name: 'targetName',
+                        title: 'target system',
+                        data: 'targetName',
+                        className: [config.tableCellLinkClass].join(' '),
+                        createdCell: function(cell, cellData, rowData, rowIndex, colIndex){
+                            // select system
+                            $(cell).on('click', function(e){
+                                Util.triggerMenuAction(Util.getMapModule().getActiveMap(), 'SelectSystem', {systemId: rowData.target});
+                            });
+                        }
+                    },{
+                        name: 'updated',
+                        title: 'updated',
+                        width: 80,
+                        searchable: false,
+                        className: ['text-right', config.tableCellCounterClass].join(' '),
+                        data: 'updated',
+                        createdCell: function(cell, cellData, rowData, rowIndex, colIndex){
+                            if(rowData.scope.scope_sort === 'wh'){
+                                // highlight cell
+                                let diff = new Date().getTime() - cellData * 1000;
+                                let dateDiff = new Date(diff);
+                                if(dateDiff.getUTCDate() > 1){
+                                    $(cell).addClass('txt-color txt-color-warning');
+                                }
+                            }
+                        }
+                    },{
+                        name: 'action',
+                        title: '',
+                        orderable: false,
+                        searchable: false,
+                        width: 10,
+                        className: ['text-center', config.tableCellActionClass].join(' '),
+                        data: null,
+                        defaultContent: '<i class="fas fa-times txt-color txt-color-redDark"></i>',
+                        createdCell: function(cell, cellData, rowData, rowIndex, colIndex){
+                            let tempTableElement = this;
 
-                        // init confirmation dialog
-                        $(cell).confirmation(tempConfirmationSettings);
+                            let confirmationSettings = {
+                                placement: 'left',
+                                title: '---',
+                                template: Util.getConfirmationTemplate(null, {
+                                    size: 'small',
+                                    noTitle: true
+                                }),
+                                onConfirm: function(e, target){
+                                    let deleteRowElement = $(target).parents('tr');
+
+                                    let connection = $().getConnectionById(mapData.config.id, rowData.id);
+                                    MapUtil.deleteConnections([connection], () => {
+                                        // callback function after ajax "delete" success
+                                        // remove table row
+                                        tempTableElement.DataTable().rows(deleteRowElement).remove().draw();
+                                    });
+                                }
+                            };
+
+                            // init confirmation dialog
+                            $(cell).confirmation(confirmationSettings);
+                        }
                     }
+                ],
+                initComplete: function(settings){
+                    connectionsElement.hideLoadingAnimation();
+                    connectionsElement.initTooltips({container: '.modal'});
+
+                    Counter.initTableCounter(this, ['updated:name']);
                 }
-            ]
-        });
+            });
+        }
     };
 
     /**
@@ -800,17 +702,6 @@ define([
         usersElement.append(userTable);
 
         usersElement.showLoadingAnimation(config.loadingOptions);
-
-        // table init complete
-        userTable.on( 'init.dt', function () {
-            usersElement.hideLoadingAnimation();
-
-            // init table tooltips
-            let tooltipElements = usersElement.find('[data-toggle="tooltip"]');
-            tooltipElements.tooltip({
-                container: usersElement.parent()
-            });
-        });
 
         // users table ------------------------------------------------------------------------------------------------
         // prepare users data for dataTables
@@ -830,17 +721,12 @@ define([
             }
         }
 
-        let userDataTable = userTable.dataTable( {
+        let userDataTable = userTable.dataTable({
             pageLength: 20,
             paging: true,
             lengthMenu: [[5, 10, 20, 50, -1], [5, 10, 20, 50, 'All']],
             ordering: true,
             order: [[ 3, 'asc' ]],
-            autoWidth: false,
-            responsive: {
-                breakpoints: Init.breakpoints,
-                details: false
-            },
             hover: false,
             data: usersData,
             language: {
@@ -856,14 +742,14 @@ define([
                     width: 26,
                     orderable: false,
                     searchable: false,
-                    className: ['pf-help-default', 'text-center', config.tableCellImageClass].join(' '),
+                    className: [Util.config.helpDefaultClass, 'text-center', config.tableCellImageClass].join(' '),
                     data: 'log.ship',
                     defaultContent: '',
                     render: {
                         _: function(data, type, row, meta){
                             let value = data;
                             if(data && type === 'display'){
-                                value = '<img src="' + Init.url.ccpImageServer + '/Render/' + value.typeId + '_32.png" title="' + value.typeName + '" data-toggle="tooltip" />';
+                                value = '<img src="' + Util.eveImageUrl('types', value.typeId) + '" title="' + value.typeName + '" data-toggle="tooltip" />';
                             }
                             return value;
                         }
@@ -901,7 +787,7 @@ define([
                         _: function(data, type, row, meta){
                             let value = data;
                             if(type === 'display'){
-                                value = '<img src="' + Init.url.ccpImageServer + '/Character/' + value + '_32.jpg" />';
+                                value = '<img src="' + Util.eveImageUrl('characters', value) + '"/>';
                             }
                             return value;
                         }
@@ -924,8 +810,8 @@ define([
                     },
                     createdCell: function(cell, cellData, rowData, rowIndex, colIndex){
                         // open character information window (ingame)
-                        $(cell).on('click', { tableApi: this.DataTable() }, function(e) {
-                            let rowData = e.data.tableApi.row(this).data();
+                        $(cell).on('click', { tableApi: this.api(), rowIndex: rowIndex }, function(e){
+                            let rowData = e.data.tableApi.row(e.data.rowIndex).data();
                             Util.openIngameWindow(rowData.id);
                         });
                     }
@@ -935,13 +821,13 @@ define([
                     width: 26,
                     orderable: false,
                     searchable: false,
-                    className: [config.tableCellImageClass, config.tableCellImageSmallClass, 'min-desktop'].join(' '),
+                    className: [config.tableCellImageClass, config.tableCellImageSmallClass, 'min-screen-l'].join(' '),
                     data: 'corporation',
                     render: {
                         _: function(data, type, row, meta){
                             let value = data;
                             if(type === 'display'){
-                                value = '<img src="' + Init.url.ccpImageServer + '/Corporation/' + value.id + '_32.png" />';
+                                value = '<img src="' + Util.eveImageUrl('corporations', value.id) + '"/>';
                             }
                             return value;
                         }
@@ -951,10 +837,10 @@ define([
                     title: 'corporation',
                     orderable: true,
                     searchable: true,
-                    className: [config.tableCellActionClass, 'min-desktop'].join(' '),
+                    className: [config.tableCellActionClass, 'min-screen-l'].join(' '),
                     data: 'corporation',
                     render: {
-                        _: function (data, type, row, meta) {
+                        _: function(data, type, row, meta){
                             let value = data.name;
                             if(type === 'display'){
                                 value += '&nbsp;' + getIconForInformationWindow();
@@ -963,8 +849,8 @@ define([
                         }
                     },
                     createdCell: function(cell, cellData, rowData, rowIndex, colIndex){
-                        // open character information window (ingame)
-                        $(cell).on('click', { tableApi: this.DataTable() }, function(e) {
+                        // open corporation information window (ingame)
+                        $(cell).on('click', { tableApi: this.api() }, function(e){
                             let cellData = e.data.tableApi.cell(this).data();
                             Util.openIngameWindow(cellData.id);
                         });
@@ -994,7 +880,7 @@ define([
                     data: 'log',
                     defaultContent: getLabelForUnknownData(),
                     render: {
-                        _: function (data, type, row, meta) {
+                        _: function(data, type, row, meta){
                             let value = data;
                             if(data){
                                 if(data.station && data.station.id > 0){
@@ -1014,10 +900,10 @@ define([
                     width: 30,
                     orderable: true,
                     searchable: true,
-                    className: ['text-right', 'min-desktop'].join(' '),
+                    className: ['text-right', 'min-screen-l'].join(' '),
                     data: 'role',
                     render: {
-                        _: function (data, type, row, meta) {
+                        _: function(data, type, row, meta){
                             let value = data.label;
                             if(type === 'display'){
                                 value = Util.getLabelByRole(data).prop('outerHTML');
@@ -1026,9 +912,40 @@ define([
                         }
                     }
                 }
-            ]
+            ],
+            initComplete: function(settings){
+                usersElement.hideLoadingAnimation();
+                usersElement.initTooltips({container: '.modal'});
+            }
         });
 
+    };
+
+    /**
+     * set global dialog observer (all tabs/tables)
+     * @param mapInfoDialog
+     * @param mapData
+     */
+    let setDialogObserver = (mapInfoDialog, mapData) => {
+
+        // planets popover --------------------------------------------------------------------------------------------
+        mapInfoDialog.hoverIntent({
+            over: function(e){
+                let cellElement = $(this);
+                let tableApi = Util.getDataTableInstance(config.tableId, mapData.config.id, '', 'systems');
+                let rowData = tableApi.row(cellElement.parents('tr')).data();
+
+                cellElement.addSystemPlanetsTooltip(rowData.planets, {
+                    trigger: 'manual',
+                    placement: 'left',
+                    show: true
+                });
+            },
+            out: function(e){
+                $(this).destroyPopover();
+            },
+            selector: 'td.' + config.systemInfoPlanetsClass
+        });
     };
 
     /**
@@ -1054,7 +971,7 @@ define([
                 context: context
             }).done(function(data){
                 this.callback(data, context);
-            }).fail(function( jqXHR, status, error) {
+            }).fail(function(jqXHR, status, error){
                 let reason = status + ' ' + error;
                 Util.showNotify({title: jqXHR.status + ': loadLogs', text: reason, type: 'warning'});
             }).always(function(){
@@ -1089,7 +1006,7 @@ define([
                 // get to last page (pageIndex starts at zero) -> check if last page > 0
                 context.tableApi.page(newPageIndex).draw(false);
             }else{
-                Util.showNotify({title: 'No logs found', text: 'No more entries', type: 'danger'});
+                Util.showNotify({title: 'No logs found', text: 'No more entries', type: 'warning'});
             }
 
         };
@@ -1141,20 +1058,35 @@ define([
                     title: '<i class="far fa-fw fa-clock"></i>',
                     width: 100,
                     className: ['text-right'].join(' '),
-                    data: 'datetime.date',
+                    data: 'datetime',
                     render: {
                         _: function(data, type, row, meta){
-                            // strip microseconds
-                            let logDateString = data.substring(0, 19) ;
-                            let logDate = new Date(logDateString.replace(/-/g, '/'));
-                            data = Util.convertDateToString(logDate, true);
-
-                            // check whether log is new (today) ->
-                            if(logDate.setHours(0,0,0,0) === serverHours) {
-                                // replace dd/mm/YYYY
-                                data = 'today' + data.substring(10);
+                            let value = '';
+                            let logDateString;
+                            if(typeof data === 'string' && data.length){
+                                // NEW: > v1.5.5 e.g: '2019-12-09T22:07:01.382455+00:00'
+                                logDateString = data;
+                            }else if(data && data.date){
+                                // OLD: <= v1.5.5 object data.date: '2019-12-09 14:50:46.608484'
+                                logDateString = data.date;
                             }
-                            return data;
+
+                            if(logDateString){
+                                logDateString = logDateString
+                                    .substring(0, 19)
+                                    .replace(/-/g, '/')
+                                    .replace(/T/g, ' ');
+                                let logDate = new Date(logDateString);
+                                value = Util.convertDateToString(logDate, true);
+
+                                // check whether log is new (today) ->
+                                if(logDate.setHours(0,0,0,0) === serverHours){
+                                    // replace dd/mm/YYYY
+                                    value = 'today' + value.substring(10);
+                                }
+                            }
+
+                            return value;
                         }
                     }
                 },{
@@ -1197,7 +1129,7 @@ define([
                         _: function(data, type, row, meta){
                             let value = data;
                             if(type === 'display'){
-                                value = '<img src="' + Init.url.ccpImageServer + '/Character/' + value + '_32.jpg" />';
+                                value = '<img src="' + Util.eveImageUrl('characters', value) + '"/>';
                             }
                             return value;
                         }
@@ -1219,8 +1151,8 @@ define([
                     },
                     createdCell: function(cell, cellData, rowData, rowIndex, colIndex){
                         // open character information window (ingame)
-                        $(cell).on('click', { tableApi: this.DataTable() }, function(e) {
-                            let rowData = e.data.tableApi.row(this).data();
+                        $(cell).on('click', { tableApi: this.api(), rowIndex: rowIndex }, function(e){
+                            let rowData = e.data.tableApi.row(e.data.rowIndex).data();
                             Util.openIngameWindow(rowData.context.data.character.id);
                         });
                     }
@@ -1239,7 +1171,6 @@ define([
                         _: function(data, type, row, meta){
                             let value = data;
                             if(type === 'display'){
-                               // txt-color-redDarker
                                 value = '<i class="fas fa-code ' + config.tableCellActionIconClass + '"></i>';
                             }
                             return value;
@@ -1248,26 +1179,33 @@ define([
                     createdCell: function(cell, cellData, rowData, rowIndex, colIndex){
                         // unset formatted string (to much content)
 
-                        if(cellData.formatted){
-                            // clone data before delete() values
-                            cellData = Object.assign({}, cellData);
-                            delete(cellData.formatted);
-                        }
+                        $(cell).on('mouseenter', function(e){
+                            let cell = $(this);
+                            if(!cell.data('bs.popover')){
+                                if(cellData.formatted){
+                                    // clone data before delete() values
+                                    cellData = Object.assign({}, cellData);
+                                    delete(cellData.formatted);
+                                }
 
-                        let jsonHighlighted = Render.highlightJson(cellData);
-                        let content = '<pre><code>' + jsonHighlighted + '</code></pre>';
+                                let jsonHighlighted = Render.highlightJson(cellData);
+                                let content = '<pre><code>' + jsonHighlighted + '</code></pre>';
 
-                        // open popover with raw log data
-                        $(cell).popover({
-                            placement: 'left',
-                            html: true,
-                            trigger: 'hover',
-                            content: content,
-                            container: 'body',
-                            title: 'Raw data',
-                            delay: {
-                                show: 180,
-                                hide: 0
+                                // open popover with raw log data
+                                cell.popover({
+                                    placement: 'left',
+                                    html: true,
+                                    trigger: 'hover',
+                                    content: content,
+                                    container: 'body',
+                                    title: 'Raw data',
+                                    delay: {
+                                        show: 180,
+                                        hide: 0
+                                    }
+                                });
+
+                                cell.popover('show');
                             }
                         });
                     }
@@ -1297,7 +1235,7 @@ define([
                 let timestampColumn =  tableApi.column('timestamp:name').header();
                 let timestampColumnCells = tableApi.cells(undefined, 'timestamp:name', {page: 'current', order:'current'});
 
-                let hasOldLogs = timestampColumnCells.render( 'display' ).reduce((hasOldLogs, cellValue) => {
+                let hasOldLogs = timestampColumnCells.render('display').reduce((hasOldLogs, cellValue) => {
                     return (hasOldLogs === false && !cellValue.startsWith('today')) ? true : hasOldLogs;
                 }, false);
 
@@ -1315,13 +1253,13 @@ define([
             class: config.tableToolsClass
         }));
 
-        let buttons = new $.fn.dataTable.Buttons( logDataTable, {
+        let buttons = new $.fn.dataTable.Buttons(logDataTable, {
             buttons: [
                 {
                     className: 'btn btn-sm btn-default',
                     text: '<i class="fas fa-fw fa-plus"></i>&nbsp;load more',
                     enabled: false,
-                    action: function ( e, dt, node, config ) {
+                    action: function(e, dt, node, config ){
                         let pageInfo = dt.page.info();
 
                         getLogsData({
@@ -1338,7 +1276,7 @@ define([
             ]
         } );
 
-        logDataTable.buttons().container().appendTo( $(this).find('.' + config.tableToolsClass));
+        logDataTable.buttons().container().appendTo($(this).find('.' + config.tableToolsClass));
     };
 
     /**
@@ -1347,13 +1285,13 @@ define([
      */
     $.fn.showMapInfoDialog = function(options){
         let activeMap = Util.getMapModule().getActiveMap();
-        let mapData = activeMap.getMapDataFromClient({forceData: true});
+        let mapData = activeMap ? activeMap.getMapDataFromClient(['hasId']) : false;
 
         if(mapData !== false){
             // "log" tab -> get "Origin", not all config options are set in mapData
             let mapDataOrigin = Util.getCurrentMapData(mapData.config.id);
 
-            requirejs(['text!templates/dialog/map_info.html', 'mustache', 'datatables.loader'], (template, Mustache) => {
+            requirejs(['text!templates/dialog/map_info.html', 'mustache'], (template, Mustache) => {
 
                 let data = {
                     dialogSummaryContainerId: config.dialogMapInfoSummaryId,
@@ -1385,14 +1323,15 @@ define([
                         success: {
                             label: 'close',
                             className: 'btn-primary',
-                            callback: function() {
+                            callback: function(){
                                 $(mapInfoDialog).modal('hide');
                             }
                         }
                     }
                 });
 
-                mapInfoDialog.on('shown.bs.modal', function(e) {
+                mapInfoDialog.on('shown.bs.modal', function(e){
+                    let mapInfoDialog = $(this);
                     let mapElement = $('#' + config.mapInfoId);
                     let systemsElement = $('#' + config.mapInfoSystemsId);
                     let connectionsElement = $('#' + config.mapInfoConnectionsId);
@@ -1403,7 +1342,7 @@ define([
                         let menuAction = $(this).attr('data-action');
                         if(menuAction === 'refresh'){
                             // get new map data
-                            let mapData = activeMap.getMapDataFromClient({forceData: true});
+                            let mapData = activeMap.getMapDataFromClient(['hasId']);
                             // find active tab
                             let activeTabLink = $(this).parents('.navbar').find('.navbar-header.pull-left li.active a');
                             if(activeTabLink.attr('href') === '#' + config.dialogMapInfoLogsId){
@@ -1428,6 +1367,9 @@ define([
 
                     // load users table
                     usersElement.initUsersInfoTable(mapData);
+
+                    // set global dialog observer
+                    setDialogObserver(mapInfoDialog, mapData);
                 });
 
                 // events for tab change
@@ -1440,6 +1382,13 @@ define([
                 });
 
             });
+        }else{
+            // no active map found (e.g. not loaded yet, or no map exists)
+            Util.showNotify({
+                title: 'Map data not found',
+                text: 'No map initialized at this point',
+                type: 'warning'}
+            );
         }
 
     };

@@ -6,9 +6,8 @@ define([
     'jquery',
     'app/init',
     'app/util',
-    'app/render',
     'bootbox'
-], function($, Init, Util, Render, bootbox) {
+], ($, Init, Util, bootbox) => {
 
     'use strict';
 
@@ -28,7 +27,7 @@ define([
 
         headlineElement.delay(300).velocity('transition.shrinkIn', {
             duration: 500
-        }).delay(800);
+        }).delay(500);
 
         headlineElement.velocity({
             scale: 1.05
@@ -52,7 +51,7 @@ define([
             // close all modals
             $('.modal').modal('hide');
 
-            requirejs(['text!templates/dialog/notification.html', 'mustache'], function(template, Mustache) {
+            requirejs(['text!templates/dialog/notification.html', 'mustache'], function(template, Mustache){
 
                 let data = {
                     id: config.notificationDialogId,
@@ -70,7 +69,7 @@ define([
                 });
 
 
-                shutdownDialog.on('shown.bs.modal', function(e) {
+                shutdownDialog.on('shown.bs.modal', function(e){
                     // remove close button
                     let dialog = $(this);
 

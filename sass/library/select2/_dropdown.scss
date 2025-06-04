@@ -1,7 +1,7 @@
 .select2-dropdown {
-  background-color: white;
+  background-color: $gray-dark;
 
-  border: 1px solid #aaa;
+  border: 1px solid $gray-light;
   border-radius: 4px;
 
   box-sizing: border-box;
@@ -13,7 +13,7 @@
 
   width: 100%;
 
-  z-index: 1051;
+  z-index: 1080;
 }
 
 .select2-results {

@@ -3,7 +3,6 @@
   opacity: 0;
 }
 
-
 // splash loading animation ============================================================================
 
 .pf-color-line{
@@ -12,19 +11,20 @@
   left: 0;
   width: 100%;
   height: 3px;
-  @include background-image(linear-gradient(to right, $green-light, $green-light 100%));
+
+  @include rainbow;
 
   &.warning{
-    @include background-image(linear-gradient(to right, $brand-warning, $brand-warning 100%));
+    background-image: linear-gradient(to right, $brand-warning, $brand-warning 100%);
   }
 
   &.danger{
-    @include background-image(linear-gradient(to right, $brand-danger, $brand-danger 100%));
+    background-image: linear-gradient(to right, $brand-danger, $brand-danger 100%);
   }
 }
 
 .pf-splash{
-  position: absolute;
+  position: fixed;
   z-index: 2000;
   background-color: $gray-darkest;
   color: $gray-light;
@@ -45,7 +45,7 @@
     text-align: center;
     max-width: 500px;
     padding: 20px;
-    @include transform( translate(-50%, -50%) );
+    transform: translate(-50%, -50%);
   }
 
   .pf-splash-debug{
@@ -68,7 +68,8 @@
   .pf-landing{
 
     #pf-logo-container{
-      margin: 5px auto;
+     // width: 250px;
+      //margin: 5px auto;
     }
 
     .pf-brand-desc {
@@ -115,35 +116,38 @@
 
   a[data-gallery] {
     position: relative;
+    display: inline-block;
+    overflow: hidden; // hide initial overlapping "before" element"
+    margin: 5px 0 15px 0;
+    box-shadow: 0 4px 10px rgba(0,0,0,0.4);
 
     &:before{
-      content: '\f002';
+      content: '\f06e';
       font-family: 'Font Awesome 5 Free';
       font-size: 20px;
-      font-weight: bold;
-      line-height: 20px;
       color: $orange;
       position: absolute;
-      top: 9px;
       height: 100%;
       width: 100%;
-      padding-top: calc(50% - 10px);
       z-index: 10;
-      text-align: center;
       @include transition(transform 0.1s ease-out, opacity 0.1s ease-out);
       will-change: transform, opacity;
       transform: scale(1.3,1.3);
       opacity: 0;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
     }
 
     &:hover{
       img{
         border-color: $teal-lightest;
-        @include filter(brightness( 50% ));
+        filter: brightness( 50% );
       }
 
       &:before{
-        @include transition-delay( 0.1s );
+        @include transition-delay( 0.05s );
         transform: scale(1,1);
         opacity: 1;
       }
@@ -155,12 +159,10 @@
         style: solid;
         color: $gray-darkest
       }
-      margin: 5px 0 15px 0;
       display: inline-block;
       will-change: all;
-      @include filter(brightness( 100% ));
+      filter: brightness( 100% );
       @include transition(all 0.2s ease-out);
-      @include box-shadow(0 4px 10px rgba(0,0,0, 0.4));
 
 
       &.pf-landing-image-preview-small{
@@ -188,48 +190,54 @@
 
 }
  // header --------------------------------------------------------------------
-#pf-landing-top{
-  height: 355px;
-  border-bottom: 1px solid $gray-dark;
-  position: relative;
+$headerHeight: 355px;
 
-  &:before{
-    content: '';
-    width: 100%;
-    height: 100%;
-    position: absolute;
-    background: url("#{$base-url}/#{$body-background-image}") $body-background-color;
-    background-repeat: no-repeat;
-    background-position: 0 0;
-    @include filter(brightness(0.9))
+#pf-landing-top{
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  height: $headerHeight - 100px;
+  border-bottom: 1px solid $gray-dark;
+  overflow: hidden; // for e.g. canvas should not overlap in "smaller" header
+  transition: height 0.25s ease-out;
+  will-change: height;
+  background-color: #050a11; // ~img background color...
+  &:hover{
+    transition-delay: 0.25s;
+    height: $headerHeight;
   }
 
-  #pf-logo-container{
-    @include transform( scale3d(0.8, 0.8, 1) ); // downscales logo
+  .pf-header-bg{
+    height: inherit;
   }
 
   #pf-header-container{
     position: absolute;
-    width: 100%;
-    background-position: center center;
-
-    #pf-header-canvas{
-      position: absolute;
-      visibility: hidden; // triggered by js
-      top: 0;
-      left: 0;
-    }
+    //width: inherit; // usefull for mobile?!
+    height: inherit;
+    pointer-events: none; // no cursor (hidden by canvas)
+    z-index: 30; // will overlap "login" area
 
     #pf-logo-container{
+      height: inherit;
       z-index: 110;
+
+      @media (max-width: $screen-sm-max) {
+        text-align: center;
+      }
+
+      > svg {
+        width: 250px; // for logo resize (if needed)
+        padding-top: 60px; // for top-navigation 30px + 30px padding
+        padding-bottom: 50px; // 50px padding
+        height: 100%;
+        opacity: .8;
+      }
     }
 
     #pf-header-preview-container{
-      position: absolute;
-      left: 400px;
-      width: 590px;
-      height: 350px;
-      top: 37px;
+      align-self: flex-end;
+      margin-bottom: -26px;
 
       .pf-header-preview-element{
         position: relative;
@@ -239,7 +247,7 @@
         width: 180px;
         padding: 7px;
         opacity: 0;
-        @include border-radius(5px);
+        border-radius: 5px;
         background: {
           color: rgba(43, 43, 43, 0.5);
         }
@@ -253,7 +261,8 @@
           position: absolute;
           width: calc(100% - 14px);
           height: calc(100% - 14px);
-          @include border-radius(3px);
+          border-radius: 3px;
+          background-image: var(--bg-image);
           background: {
             repeat: no-repeat;
             position: 50% 50%;
@@ -265,52 +274,28 @@
     }
   }
 
-  .container{
-    position: relative;
-    margin-top: 10px;
-  }
-}
+  #pf-header-canvas{
+    position: absolute;
+    top: 0;
+    left: 0;
 
-#pf-header-preview-intel{
-  &:after{
-    background-image: url("#{$base-url}/landing/intel.png");
-  }
-}
-
-#pf-header-preview-map{
-  &:after{
-    background-image: url("#{$base-url}/landing/map.png");
-  }
-}
-
-#pf-header-preview-scope{
-  &:after{
-    background-image: url("#{$base-url}/landing/scope.png");
-  }
-}
-
-#pf-header-preview-signature{
-  &:after{
-    background-image: url("#{$base-url}/landing/signature.png");
-  }
-}
-
-#pf-header-preview-data{
-  &:after{
-    background-image: url("#{$base-url}/landing/data.png");
-  }
-}
-
-#pf-header-preview-gameplay{
-  &:after{
-    background-image: url("#{$base-url}/landing/gameplay.png");
+    &.fade.in{
+      cursor: none;
+    }
   }
 }
 
 // login ----------------------------------------------------------------------
 #pf-landing-login{
+  position: relative; // equired because <canvas> gets overlapped by this element
+  background-color: inherit; // ^^
+  z-index: 20; // ^^
   padding-top: 40px;
   padding-bottom: 30px;
+
+  @media (max-width: $screen-sm-max) {
+    padding-top: 10px;
+  }
 
   .row{
     margin-bottom: 0;
@@ -327,8 +312,7 @@
     padding: 10px 10px 5px 10px;
     min-width: 155px;
     min-height: 184px;
-    overflow: visible;  // overwrite default
-    @include border-radius(10px);
+    border-radius: 10px;
     @include box-shadow(0 4px 10px rgba(0,0,0, 0.4));
 
     .ribbon-wrapper{
@@ -340,9 +324,9 @@
       opacity: 0;
       width: 128px;
       border: 2px solid $gray-light;
-      @include border-radius(8px);
+      border-radius: 8px;
       @include transition( border-color 0.2s ease-out, box-shadow 0.2s ease-out);
-      @include transform( translate3d(0, 0, 0) );
+      transform: translate3d(0, 0, 0);
       will-change: border-color, transition;
       overflow: hidden;
       cursor: pointer;
@@ -358,7 +342,7 @@
         }
 
         .pf-character-image{
-          @include filter(grayscale(50%))
+          filter: grayscale(50%);
         }
       }
 
@@ -394,7 +378,11 @@
           background: rgba($gray, 0.80);
           overflow: hidden;
           will-change: width, transition;
-          padding: 10px 0;
+          padding: 5px 0;
+
+          .pf-character-info-img{
+            width: 36px;
+          }
 
           .pf-character-info-text{
             line-height: 25px;
@@ -411,13 +399,35 @@
       }
 
       .pf-character-image{
+        border-top-left-radius: 8px;
+        border-top-right-radius: 8px;
         @include transition(all 0.3s ease-out);
-        @include filter(grayscale(0%));
+        filter: grayscale(0%);
       }
     }
   }
 
   .pf-sso-login-button{
+    width: 270px;
+    height: 45px;
+    margin-top: 10px;
+    margin-bottom: 15px;
+    color: $gray-lighter;
+    filter: drop-shadow(0 4px 5px rgba(0,0,0, 0.4));
+    transition: color 0.18s ease-out, filter 0.06s ease-out;
+    will-change: color, fill;
+
+    &:hover {
+      color: $orange;
+      filter: drop-shadow(0 1px 3px rgba(0,0,0, 0.4));
+    }
+
+    > svg {
+      width: inherit;
+      height: inherit;
+    }
+
+    /*
     position: relative;
     display: inline-block;
     width: 270px;
@@ -425,11 +435,26 @@
     border: none;
     margin-bottom: 10px;
     background-color: transparent;
-    background-image: url("#{$base-url}/landing/eve_sso_login_buttons_large_black_hover.png");
+    background-image: var(--bg-image-hover);
     cursor: pointer;
     box-shadow: 0 2px 5px rgba(0, 0, 0, 0.2);
-    @include transition(box-shadow 0.12s ease-out);
-    will-change: box-shadow;
+
+    &:before{
+      content: ' ';
+      position: absolute;
+      top: 0;
+      right: 0;
+      bottom: 0;
+      left: 0;
+
+      // Create the box shadow at expanded size.
+     // box-shadow: 0 4px 5px rgba(0, 0, 0, 0.2);
+
+      // Hidden by default.
+      opacity: 0;
+      //@include transition(opacity 0.12s ease-in-out);
+      //will-change: opacity;
+    }
 
     &:after {
       content: ' ';
@@ -438,13 +463,15 @@
       height: 45px;
       left: 0;
       top: 0;
-      background-image: url("#{$base-url}/landing/eve_sso_login_buttons_large_black.png");
-      @include transition(opacity 0.12s ease-in-out);
-      will-change: opacity;
+      background-image: var(--bg-image);
+      //@include transition(opacity 0.12s ease-in-out);
+      //will-change: opacity;
     }
 
     &:hover {
-      box-shadow: 0 4px 5px rgba(0, 0, 0, 0.2);
+      &:before{
+        opacity: 1;
+      }
 
       &:after{
         opacity: 0;
@@ -454,90 +481,11 @@
     &.disabled{
       pointer-events: auto; // required for tooltips to be shown on "disabled" links
     }
+     */
   }
 
   #pf-notification-panel{
     display: none;
-  }
-}
-
-// demo map -------------------------------------------------------------------
-#pf-header-map{
-  // the size matches the size of the svg-map
-  position: relative;
-  margin: 0 auto;
-  height: 380px;
-  width: 600px;
-  pointer-events: none;
-
-  .pf-header-svg-layer{
-    position: absolute;
-    top: 0;
-    left: 0;
-    right: 0;
-    bottom: 0;
-  }
-
-  // system layer
-  #pf-header-systems{
-    z-index: 100;
-  }
-
-  // connector layer
-  #pf-header-connectors{
-    z-index: 90;
-  }
-
-  // connector layer
-  #pf-header-connections{
-    z-index: 80;
-  }
-
-  // background layer
-  #pf-header-background{
-    z-index: 70;
-
-    .pf-header-system{
-      display: none;
-    }
-  }
-}
-
-// map bg
-#pf-header-map-bg{
-  position: absolute;
-  left: 0;
-  top: 0;
-  width: 100%;
-  height: 100%;
-  pointer-events: none;
-
-  img{
-    pointer-events: none;
-  }
-
-  #pf-map-bg-image{
-    opacity: 0; // triggered by js
-    position: absolute;
-    bottom: 0;
-    right: 0;
-    width: 100%;
-    height: 100%;
-  }
-
-  #pf-map-neocom{
-    opacity: 0; // triggered by js
-    height: 665px;
-    width: 21px;
-  }
-
-  #pf-map-browser{
-    opacity: 0; // triggered by js
-    position: absolute;
-    top: 110px;
-    left: 21px;
-    height: 560px;
-    width: 515px;
   }
 }
 
@@ -557,17 +505,13 @@
   }
 }
 
-// gallery --------------------------------------------------------------------
-#pf-landing-gallery{
-
-}
-
 // pricing --------------------------------------------------------------------
 .pf-landing-pricing-panel{
   margin-top: 20px;
 }
 
 .pricing-big{
+  position: relative;
   @include box-shadow(0 4px 10px rgba(0,0,0, 0.4));
 
   .panel-heading{
@@ -604,9 +548,22 @@
     }
   }
 
+  .badge{
+    color: $gray-lighter;
+    background-color: $gray-darker;
+  }
+
   // table
   table tr td {
     line-height: 1;
+
+    .btn-group {
+      .btn { // smaller buttons on /setup page in tables
+        border-radius: 0;
+        padding-top: 4px;
+        padding-bottom: 4px;
+      }
+    }
   }
 }
 
@@ -638,19 +595,23 @@
     margin-bottom: 0 !important; // overwrite default
   }
 
-  .pf-social-networks > li{
-    display: inline-block;
-    line-height: 1;
+  .pf-social-networks{
+    margin-bottom: 0; // overwrite default
 
-    a {
+    > li{
       display: inline-block;
-      background: rgba(red($gray-light), green($gray-light), blue($gray-light), 0.5);
-      line-height: 24px;
-      text-align: center;
-      font-size: 14px;
-      margin-right: 3px;
-      padding: 6px 6px 2px 6px;
-      width: 36px;
+      line-height: 1;
+
+      a {
+        display: inline-block;
+        background: rgba(red($gray-light), green($gray-light), blue($gray-light), 0.5);
+        line-height: 24px;
+        text-align: center;
+        font-size: 14px;
+        margin-right: 3px;
+        padding: 6px 6px 2px 6px;
+        width: 36px;
+      }
     }
   }
 }
@@ -668,8 +629,9 @@
       position: absolute;
       right: 0;
       top: 0;
-      margin: 4px 14px 0 0;
-      border-radius: 30%;
+      margin: 5px 14px 0 0;
+      border-radius: 5px;
+      width: 28px;
     }
 
   }
@@ -678,6 +640,75 @@
   }
 }
 
+// setup page -----------------------------------------------------------------
+.pf-body[data-script='setup']{
+  user-select: text;
+
+  .navbar-brand:hover{
+    color: #777; // overwrite default
+  }
+
+  section {
+    min-height: auto; // overwrite default
+    padding-top: 10px; // overwrite default
+    padding-bottom: 0; // overwrite default
+    border-bottom: 0; // overwrite default
+
+    &:first-of-type{
+      padding-top: 60px;
+    }
+
+    &:last-of-type{
+      padding-bottom: 60px;
+    }
+
+    .container{
+      // increase container width (display more data)
+      @media (min-width: $screen-sm-min) {
+        width: $container-sm + 20px;
+      }
+      @media (min-width: $screen-md-min) {
+        width: $container-md + 80px;
+      }
+      @media (min-width: $screen-lg-min) {
+        width: $container-lg + 100px;
+      }
+
+      & > .row{
+        margin-bottom: 0; // overwrite default
+      }
+    }
+  }
+
+  .pf-landing-pricing-panel{
+    margin-top: 10px; // overwrite default
+  }
+
+  .panel-heading{
+    padding-right: 8px; // overwrite default
+  }
+
+  .table{
+    text-align: left;
+  }
+
+  .pf-setup-body-cronjob{
+    .panel-footer{
+      display: flex; // align multiple error/warning/.. elements
+      justify-content: space-around;
+    }
+  }
+
+  .pf-cron-row-active{
+    td:not(:last-child){
+      background-color: $teal-darker;
+    }
+
+    td:first-child{
+      background-color: $teal-darkest;
+    }
+  }
+}
 
 // TEST ---
 /*

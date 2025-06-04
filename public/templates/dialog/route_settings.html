@@ -2,7 +2,7 @@
     <form  role="form" class="form-horizontal">
 
         <div class="row">
-            <div class="col-xs-8">
+            <div class="col-xs-7">
                 <div class="form-group">
                     <label class="col-sm-2 control-label" for="form_system">Systems</label>
                     <div class="col-sm-10">
@@ -10,13 +10,19 @@
                             <label for="form_system"></label>
                             <select id="form_system" name="routeSystems[]" class="{{selectClass}}" multiple="multiple">
                                 {{#systemSelectOptions}}
-                                <option value="{{name}}" data-systemid="{{systemId}}" selected="selected">{{name}}</option>
+                                <option value="{{systemId}}" selected="selected">{{name}}</option>
                                 {{/systemSelectOptions}}
                             </select>
                             <span class="help-block with-errors">Set default systems (max {{maxSelectionLength}}) for route search</span>
                         </div>
                     </div>
                 </div>
+            </div>
+            <div class="col-xs-5">
+                <blockquote class="pull-right">
+                    <p>Select <em>"Thera"</em> also works.</p>
+                    <small>Connections from <em><a target="_blank" href="//www.eve-scout.com" rel="noopener">eve-scout.com</a></em> API</small>
+                </blockquote>
             </div>
         </div>
 

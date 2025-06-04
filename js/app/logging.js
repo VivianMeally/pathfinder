@@ -6,8 +6,10 @@ define([
     'jquery',
     'app/init',
     'app/util',
-    'bootbox'
-], function($, Init, Util, bootbox) {
+    'app/counter',
+    'bootbox',
+    'app/lib/resize'
+], ($, Init, Util, Counter, bootbox) => {
 
     'use strict';
 
@@ -20,35 +22,24 @@ define([
 
     let config = {
         taskDialogId: 'pf-task-dialog',                                                 // id for map "task manager" dialog
-        dialogDynamicAreaClass: 'pf-dynamic-area',                                      // class for dynamic areas
         timestampCounterClass: 'pf-timestamp-counter',                                  // class for "timestamp" counter
         taskDialogStatusAreaClass: 'pf-task-dialog-status',                             // class for "status" dynamic area
         taskDialogLogTableAreaClass: 'pf-task-dialog-table',                            // class for "log table" dynamic area
         logGraphClass: 'pf-log-graph',                                                  // class for all log Morris graphs
-        tableToolsClass: 'pf-table-tools'                                               // class for table tools
-    };
-
-    /**
-     * get log time string
-     * @returns {string}
-     */
-    let getLogTime = function(){
-        let serverTime = Util.getServerTime();
-        let logTime = serverTime.toLocaleTimeString('en-US', { hour12: false });
-
-        return logTime;
+        moduleHeadlineIconClass: 'pf-module-icon-button'                                // class for toolbar icons in the head
     };
 
     /**
      * updated "sync status" dynamic dialog area
      */
-    let updateSyncStatus = function(){
-
+    let updateSyncStatus = () => {
         // check if task manager dialog is open
         let logDialog = $('#' + config.taskDialogId);
         if(logDialog.length){
             // dialog is open
-            requirejs(['text!templates/modules/sync_status.html', 'mustache'], function(templateSyncStatus, Mustache) {
+            let statusArea = logDialog.find('.' + config.taskDialogStatusAreaClass);
+            statusArea.destroyTooltips(true);
+            requirejs(['text!templates/modules/sync_status.html', 'mustache'], (templateSyncStatus, Mustache) => {
                 let data = {
                     timestampCounterClass: config.timestampCounterClass,
                     syncStatus: Init.syncStatus,
@@ -60,13 +51,15 @@ define([
                     }
                 };
 
-                let syncStatusElement = $( Mustache.render(templateSyncStatus, data ) );
+                let syncStatusElement = $(Mustache.render(templateSyncStatus, data ));
+                Counter.destroyTimestampCounter(statusArea, true);
 
-                logDialog.find('.' + config.taskDialogStatusAreaClass).html( syncStatusElement );
+                statusArea.html(syncStatusElement);
 
-                logDialog.find('.' + config.timestampCounterClass).initTimestampCounter();
+                let counterElements = syncStatusElement.find('.' + config.timestampCounterClass);
+                Counter.initTimestampCounter(counterElements);
 
-                syncStatusElement.initTooltips({
+                statusArea.initTooltips({
                     placement: 'right'
                 });
             });
@@ -77,16 +70,13 @@ define([
     /**
      * shows the logging dialog
      */
-    let showDialog = function(){
-        // dialog content
-
-        requirejs(['text!templates/dialog/task_manager.html', 'mustache', 'datatables.loader'], function(templateTaskManagerDialog, Mustache) {
+    let showDialog = () => {
+        requirejs(['text!templates/dialog/task_manager.html', 'mustache'], function(templateTaskManagerDialog, Mustache){
             let data = {
                 id: config.taskDialogId,
-                dialogDynamicAreaClass: config.dialogDynamicAreaClass,
+                dialogDynamicAreaClass: Util.config.dynamicAreaClass,
                 taskDialogStatusAreaClass: config.taskDialogStatusAreaClass,
-                taskDialogLogTableAreaClass: config.taskDialogLogTableAreaClass,
-                tableActionBarClass: config.tableToolsClass
+                taskDialogLogTableAreaClass: config.taskDialogLogTableAreaClass
             };
 
             let contentTaskManager = $( Mustache.render(templateTaskManagerDialog, data) );
@@ -102,10 +92,35 @@ define([
 
             // init log table
             logDataTable = logTable.DataTable({
+                dom: '<"flex-row flex-between"<"flex-col"l><"flex-col"B><"flex-col"fS>>' +
+                    '<"flex-row"<"flex-col flex-grow"tr>>' +
+                    '<"flex-row flex-between"<"flex-col"i><"flex-col"p>>',
+                buttons: {
+                    name: 'tableTools',
+                    buttons: [
+                        {
+                            extend: 'copy',
+                            tag: 'a',
+                            className: config.moduleHeadlineIconClass,
+                            text: '<i class="fas fa-fw fa-copy"></i> copy',
+                            exportOptions: {
+                                orthogonal: 'export'
+                            }
+                        },
+                        {
+                            extend: 'csv',
+                            tag: 'a',
+                            className: config.moduleHeadlineIconClass,
+                            text: '<i class="fas fa-fw fa-download"></i> csv',
+                            exportOptions: {
+                                orthogonal: 'export'
+                            }
+                        }
+                    ]
+                },
                 paging: true,
                 ordering: true,
-                order: [ 1, 'desc' ],
-                autoWidth: false,
+                order: [1, 'desc'],
                 hover: false,
                 pageLength: 10,
                 lengthMenu: [[5, 10, 25, 50, 100, -1], [5, 10, 25, 50, 100, 'All']],
@@ -113,48 +128,75 @@ define([
                 language: {
                     emptyTable:  'No entries',
                     zeroRecords: 'No entries found',
-                    lengthMenu:  'Show _MENU_ entries',
+                    lengthMenu:  'Show _MENU_',
                     info:        'Showing _START_ to _END_ of _TOTAL_ entries'
                 },
                 columnDefs: [
                     {
                         targets: 0,
+                        name: 'status',
                         title: '<i class="fas fa-tag"></i>',
-                        width: '18px',
+                        width: 18,
                         searchable: false,
                         class: ['text-center'].join(' '),
-                        data: 'status'
+                        data: 'status',
+                        render: {
+                            display: (cellData, type, rowData, meta) => {
+                                let statusClass = Util.getLogInfo(cellData, 'class');
+                                return '<i class="fas fa-fw fa-circle txt-color ' + statusClass + '"></i>';
+                            }
+                        }
                     },{
                         targets: 1,
-                        title: '<i class="far fa-fw fa-clock"></i>&nbsp;&nbsp;',
-                        width: '50px',
+                        name: 'time',
+                        title: '<i class="far fa-fw fa-clock"></i>',
+                        width: 50,
                         searchable: true,
                         class: 'text-right',
-                        data: 'time'
+                        data: 'timestamp',
+                        render: {
+                            display: (cellData, type, rowData, meta) => rowData.timestampFormatted
+                        }
                     },{
                         targets: 2,
-                        title: '<i class="fas fa-fw fa-history"></i>&nbsp;&nbsp;',
-                        width: '35px',
+                        name: 'duration',
+                        title: '<i class="fas fa-fw fa-history"></i>',
+                        width: 35,
                         searchable: false,
                         class: 'text-right',
-                        sType: 'html',
-                        data: 'duration'
+                        data: 'duration',
+                        render: {
+                            display: (cellData, type, rowData, meta) => {
+                                let logStatus = getLogStatusByDuration(rowData.key, cellData);
+                                let statusClass = Util.getLogInfo(logStatus, 'class');
+                                return '<span class="txt-color ' + statusClass + '">' + cellData + '<small>ms</small></span>';
+                            }
+                        }
                     },{
                         targets: 3,
+                        name: 'description',
                         title: 'description',
                         searchable: true,
                         data: 'description'
                     },{
                         targets: 4,
+                        name: 'logType',
                         title: 'type',
-                        width: '40px',
+                        width: 40,
                         searchable: true,
                         class: ['text-center'].join(' '),
-                        data: 'type'
+                        data: 'logType',
+                        render: {
+                            display: (cellData, type, rowData, meta) => {
+                                let typeIconClass = getLogTypeIconClass(cellData);
+                                return '<i class="fas ' + typeIconClass + '"></i>';
+                            }
+                        }
                     },{
                         targets: 5,
-                        title: 'Prozess-ID&nbsp;&nbsp;&nbsp;',
-                        width: '80px',
+                        name: 'process',
+                        title: 'Prozess-ID',
+                        width: 80,
                         searchable: false,
                         class: 'text-right',
                         data: 'key'
@@ -177,18 +219,15 @@ define([
             });
 
             // modal dialog is shown
-            logDialog.on('shown.bs.modal', function(e) {
+            logDialog.on('shown.bs.modal', function(e){
                 updateSyncStatus();
 
                 // show Morris graphs ----------------------------------------------------------
 
-                // function for chart label formation
-                let labelYFormat = function(y){
-                    return Math.round(y) + 'ms';
-                };
+                let labelYFormat = val => Math.round(val) + 'ms';
 
-                for(let key in chartData) {
-                    if(chartData.hasOwnProperty(key)) {
+                for(let key in chartData){
+                    if(chartData.hasOwnProperty(key)){
                         // create a chart for each key
 
                         let colElementGraph = $('<div>', {
@@ -202,7 +241,7 @@ define([
                         });
 
                         let graphArea = $('<div>', {
-                            class: config.dialogDynamicAreaClass
+                            class: Util.config.dynamicAreaClass
                         }).append(  graphElement );
 
                         let headline = $('<h4>', {
@@ -226,8 +265,8 @@ define([
                         });
                         headline.append(averageElement);
 
-                        colElementGraph.append( headline );
-                        colElementGraph.append( graphArea );
+                        colElementGraph.append(headline);
+                        colElementGraph.append(graphArea);
 
                         graphArea.showLoadingAnimation();
 
@@ -243,70 +282,61 @@ define([
                             xkey: 'x',
                             ykeys: ['y'],
                             labels: [key],
-                            units: 'ms',
-                            parseTime: false,
-                            ymin: 0,
-                            yLabelFormat: labelYFormat,
-                            padding: 10,
-                            hideHover: true,
-                            pointSize: 3,
                             lineColors: ['#375959'],
+                            lineWidth: 2,
+                            pointSize: 3,
                             pointFillColors: ['#477372'],
                             pointStrokeColors: ['#313335'],
-                            lineWidth: 2,
-                            grid: false,
-                            gridStrokeWidth: 0.3,
-                            gridTextSize: 9,
-                            gridTextFamily: 'Oxygen Bold',
-                            gridTextColor: '#63676a',
-                            behaveLikeLine: true,
-                            goals: [],
-                            goalLineColors: ['#66c84f'],
+                            ymin: 0,
                             smooth: false,
-                            fillOpacity: 0.3,
-                            resize: true
+                            hideHover: true,
+                            parseTime: false,
+                            postUnits: 'ms',
+                            yLabelFormat: labelYFormat,
+                            goals: [],
+                            goalStrokeWidth: 1,
+                            goalLineColors: ['#66c84f'],
+                            grid: true,
+                            gridTextColor: '#63676a',
+                            gridTextSize: 9,
+                            gridTextFamily: 'Arial, "Oxygen Bold"',
+                            gridTextWeight: 'bold',
+                            gridStrokeWidth: 0.3,
+                            resize: true, // we use our own resize function
+                            dataLabels: false,
+                            hoverReversed: true,
+                            // Area chart specific options
+                            behaveLikeLine: true,
+                            fillOpacity: 0.5,
+                            belowArea: true,
+                            areaColors: ['#3c3f41'],
+                            // Not documented but working
+                            padding: 8,
                         });
 
                         updateLogGraph(key);
 
                         graphArea.hideLoadingAnimation();
-
                     }
                 }
-
-                // ------------------------------------------------------------------------------
-                // add dataTable buttons (extension)
-
-                let buttons = new $.fn.dataTable.Buttons( logDataTable, {
-                    buttons: [
-                        {
-                            extend: 'copy',
-                            className: 'btn btn-sm btn-default',
-                            text: '<i class="fas fa-fw fa-copy"></i> copy'
-                        },{
-                            extend: 'csv',
-                            className: 'btn btn-sm btn-default',
-                            text: '<i class="fas fa-fw fa-download"></i> csv'
-                        }
-                    ]
-                } );
-
-                logDataTable.buttons().container().appendTo( $(this).find('.' + config.tableToolsClass));
-            });
-
-
-            // modal dialog is closed
-            logDialog.on('hidden.bs.modal', function(e) {
-                // clear memory -> destroy all charts
-                for (let key in chartData) {
-                    if (chartData.hasOwnProperty(key)) {
-                        chartData[key].graph = null;
-                    }
-                }
+/*
+                Util.getResizeManager().observe(
+                    this.querySelector('.modal-dialog'),
+                    (el, contentRect) => Object.values(chartData).forEach(data => {
+                        if(data.graph) data.graph.redraw();
+                    }),
+                    {debounce: true, ms: 100}
+                );*/
             });
 
             // modal dialog before hide
-            logDialog.on('hide.bs.modal', function(e) {
+            logDialog.on('hide.bs.modal', function(e){
+                Object.entries(chartData).forEach(([key, data]) => {
+                    if(data.graph){
+                        data.graph.destroy();
+                        delete chartData[key].graph;
+                    }
+                });
 
                 // destroy logTable
                 logDataTable.destroy(true);
@@ -325,15 +355,16 @@ define([
      * @param key
      * @param duration (if undefined -> just update graph with current data)
      */
-    let updateLogGraph = function(key, duration){
+    let updateLogGraph = (key, duration) => {
 
         // check if graph data already exist
-        if( !(chartData.hasOwnProperty(key))){
-            chartData[key] = {};
-            chartData[key].data = [];
-            chartData[key].graph = null;
-            chartData[key].averageElement = null;
-            chartData[key].updateElement = null;
+        if(!chartData.hasOwnProperty(key)){
+            chartData[key] = {
+                data: [],
+                graph: null,
+                averageElement: null,
+                updateElement: null
+            };
         }
 
         // add new value
@@ -345,7 +376,7 @@ define([
             chartData[key].data = chartData[key].data.slice(0, maxGraphDataCount);
         }
 
-        function getGraphData(data) {
+        let getGraphData = data => {
             let tempChartData = {
                 data: [],
                 dataSum: 0,
@@ -356,7 +387,7 @@ define([
                 let value = 0;
                 if(data[x]){
                     value = data[x];
-                    tempChartData.dataSum = Number( (tempChartData.dataSum + value).toFixed(2) );
+                    tempChartData.dataSum = Number((tempChartData.dataSum + value).toFixed(2));
                 }
 
                 tempChartData.data.push({
@@ -366,32 +397,32 @@ define([
             }
 
             // calculate average
-            tempChartData.average = Number( ( tempChartData.dataSum / data.length ).toFixed(2) );
+            tempChartData.average = Number((tempChartData.dataSum / data.length).toFixed(2));
 
             return tempChartData;
-        }
+        };
 
         let tempChartData = getGraphData(chartData[key].data);
 
         // add new data to graph (Morris chart) - if is already initialized
-        if(chartData[key].graph !== null){
+        if(chartData[key].graph){
             let avgElement = chartData[key].averageElement;
             let updateElement = chartData[key].updateElement;
 
-            let delay = Util.getCurrentTriggerDelay( key, 0 );
+            let delay = Util.getCurrentTriggerDelay(key, 0);
 
             if(delay){
-                updateElement[0].textContent = ' delay: ' + delay + 'ms ';
+                updateElement[0].textContent = ' delay: ' + delay.toFixed(2) + ' ms';
             }
 
             // set/change average line
             chartData[key].graph.options.goals = [tempChartData.average];
 
             // change avg. display
-            avgElement[0].textContent = 'Avg. ' + tempChartData.average + 'ms';
+            avgElement[0].textContent = 'avg. ' + tempChartData.average.toFixed(2) + ' ms';
 
             let avgStatus = getLogStatusByDuration(key, tempChartData.average);
-            let avgStatusClass = Util.getLogInfo( avgStatus, 'class' );
+            let avgStatusClass = Util.getLogInfo( avgStatus, 'class');
 
             //change avg. display class
             if( !avgElement.hasClass(avgStatusClass) ){
@@ -421,9 +452,9 @@ define([
      * @param logDuration
      * @returns {string}
      */
-    let getLogStatusByDuration = function(logKey, logDuration){
+    let getLogStatusByDuration = (logKey, logDuration) => {
         let logStatus = 'info';
-        if( logDuration > Init.timer[logKey].EXECUTION_LIMIT ){
+        if(logDuration > Init.timer[logKey].EXECUTION_LIMIT){
             logStatus = 'warning';
         }
         return logStatus;
@@ -434,8 +465,7 @@ define([
      * @param logType
      * @returns {string}
      */
-    let getLogTypeIconClass = function(logType){
-
+    let getLogTypeIconClass = logType => {
         let logIconClass = '';
 
         switch(logType){
@@ -453,16 +483,16 @@ define([
     /**
      * init logging -> set global log events
      */
-    let init = function(){
+    let init = () => {
 
         let maxEntries = 150;
 
-        $(window).on('pf:syncStatus', function(){
+        $(window).on('pf:syncStatus', () => {
             updateSyncStatus();
         });
 
         // set global logging listener
-        $(window).on('pf:log', function(e, logKey, options){
+        $(window).on('pf:log', (e, logKey, options) => {
 
             // check required logging information
             if(
@@ -474,23 +504,22 @@ define([
                 let logDuration = options.duration;
                 let logType = options.type;
 
-                // check log status by duration
-                let logStatus = getLogStatusByDuration(logKey, logDuration);
-                let statusClass = Util.getLogInfo( logStatus, 'class' );
-                let typeIconClass = getLogTypeIconClass(logType);
-
                 // update graph data
                 updateLogGraph(logKey, logDuration);
 
+                let time = Util.getServerTime();
+                let timestamp = time.getTime();
+                let timestampFormatted = time.toLocaleTimeString('en-US', { hour12: false });
+
                 let logRowData = {
-                    status:  '<i class="fas fa-fw fa-circle txt-color ' + statusClass + '"></i>',
-                    time: getLogTime(),
-                    duration: '<span class="txt-color ' + statusClass + '">' + logDuration + '<small>ms</small></span>',
+                    status: getLogStatusByDuration(logKey, logDuration),
+                    timestamp: timestamp,
+                    timestampFormatted: timestampFormatted,
+                    duration: logDuration,
                     description: logDescription,
-                    type: '<i class="fas ' + typeIconClass + '"></i>',
+                    logType: logType,
                     key: logKey
                 };
-
 
                 if(logDataTable){
                     // add row if dataTable is initialized before new log
@@ -502,10 +531,7 @@ define([
             }
 
             // delete old log entries from table ---------------------------------
-            let rowCount = logData.length;
-
-            if( rowCount >= maxEntries ){
-
+            if(logData.length >= maxEntries){
                 if(logDataTable){
                     logDataTable.rows(0, {order:'index'}).remove().draw(false);
                 }else{
@@ -524,7 +550,6 @@ define([
 
     return {
         init: init,
-        getLogTime: getLogTime,
         showDialog: showDialog
     };
 });

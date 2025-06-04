@@ -6,9 +6,8 @@ define([
     'jquery',
     'app/init',
     'app/util',
-    'app/render',
     'bootbox'
-], function($, Init, Util, Render, bootbox) {
+], ($, Init, Util, bootbox) => {
     'use strict';
 
     let config = {
@@ -42,7 +41,7 @@ define([
             return false;
         }
 
-        requirejs(['text!templates/dialog/settings.html', 'mustache'], function(template, Mustache) {
+        requirejs(['text!templates/dialog/settings.html', 'mustache'], function(template, Mustache){
 
             let data = {
                 id: config.settingsDialogId,
@@ -54,7 +53,9 @@ define([
                 captchaImageId: config.captchaImageId,
                 formErrorContainerClass: Util.config.formErrorContainerClass,
                 ccpImageServer: Init.url.ccpImageServer,
-                roleLabel: Util.getLabelByRole(Util.getObjVal(Util.getCurrentUserData(), 'character.role')).prop('outerHTML'),
+                roleLabel: Util.getLabelByRole(Util.getCurrentCharacterData('role')).prop('outerHTML'),
+                characterAutoLocationSelectEnabled: Boolean(Util.getObjVal(Init, 'character.autoLocationSelect')),
+                hasRightCorporationShare: Util.hasRight('map_share', 'corporation')
             };
 
             let content = Mustache.render(template, data);
@@ -62,6 +63,7 @@ define([
             let accountSettingsDialog = bootbox.dialog({
                 title: 'Account settings',
                 message: content,
+                show: false,
                 buttons: {
                     close: {
                         label: 'cancel',
@@ -70,7 +72,7 @@ define([
                     success: {
                         label: '<i class="fas fa-check fa-fw"></i>&nbsp;save',
                         className: 'btn-success',
-                        callback: function() {
+                        callback: function(){
 
                             // get the current active form
                             let form = $('#' + config.settingsDialogId).find('form').filter(':visible');
@@ -128,11 +130,10 @@ define([
                                         Util.showNotify({title: 'Account saved', type: 'success'});
 
                                         // close dialog/menu
-                                        $(document).trigger('pf:closeMenu', [{}]);
+                                        Util.triggerMenuAction(document, 'Close');
                                         accountSettingsDialog.modal('hide');
                                     }
-
-                                }).fail(function( jqXHR, status, error) {
+                                }).fail(function(jqXHR, status, error){
                                     accountSettingsDialog.find('.modal-content').hideLoadingAnimation();
 
                                     let reason = status + ' ' + error;
@@ -170,12 +171,7 @@ define([
                 }
             });
 
-            // after modal is shown =======================================================================
-            accountSettingsDialog.on('shown.bs.modal', function(e) {
-
-                let dialogElement = $(this);
-                let form = dialogElement.find('form');
-
+            accountSettingsDialog.on('show.bs.modal', function(e){
                 // request captcha image and show
                 let captchaImageWrapperContainer = $('#' + config.captchaImageWrapperId);
                 captchaImageWrapperContainer.showCaptchaImage(config.captchaKeyUpdateAccount);
@@ -184,19 +180,19 @@ define([
                 captchaImageWrapperContainer.find('i').on('click', function(){
                     captchaImageWrapperContainer.showCaptchaImage(config.captchaKeyUpdateAccount);
                 });
+            });
 
+            // after modal is shown =======================================================================
+            accountSettingsDialog.on('shown.bs.modal', function(e){
+                let dialogElement = $(this);
+                let form = dialogElement.find('form');
 
-                // init dialog tooltips
                 dialogElement.initTooltips();
 
                 form.initFormValidation();
-            });
 
-            // events for tab change
-            accountSettingsDialog.find('.navbar a').on('shown.bs.tab', function(e){
-
-                // init "toggle" switches on current active tab
-                accountSettingsDialog.find( $(this).attr('href') ).find('input[data-toggle="toggle"][type="checkbox"]').bootstrapToggle({
+                // init "toggle" switches
+                dialogElement.find('input[type="checkbox"][data-toggle="toggle"]').bootstrapToggle({
                     on: '<i class="fas fa-fw fa-check"></i>&nbsp;Enable',
                     off: 'Disable&nbsp;<i class="fas fa-fw fa-ban"></i>',
                     onstyle: 'success',
@@ -204,9 +200,10 @@ define([
                     width: 100,
                     height: 30
                 });
-
             });
 
+            // show dialog
+            accountSettingsDialog.modal('show');
         });
     };
 });

@@ -9,21 +9,37 @@ define([
     'app/render',
     'bootbox',
     'app/map/util',
-    'app/module_map'
-], ($, Init, Util, Render, bootbox, MapUtil, ModuleMap) => {
+    'app/module_map',
+    'app/map/overlay/util',
+], ($, Init, Util, Render, bootbox, MapUtil, ModuleMap, MapOverlayUtil) => {
     'use strict';
 
     let config = {
         // map dialog
         newMapDialogId: 'pf-map-dialog',                                                // id for map settings dialog
-        dialogMapCreateContainerId: 'pf-map-dialog-create',                             // id for the "new map" container
+        dialogMapNewContainerId: 'pf-map-dialog-new',                                   // id for the "new map" container
         dialogMapEditContainerId: 'pf-map-dialog-edit',                                 // id for the "edit" container
         dialogMapSettingsContainerId: 'pf-map-dialog-settings',                         // id for the "settings" container
         dialogMapDownloadContainerId: 'pf-map-dialog-download',                         // id for the "download" container
 
+        // new map form
+        newNameInputId: 'pf-map-dialog-new-name-input',                                 // id for "name" input
+        newIconSelectId: 'pf-map-dialog-new-icon-select',                               // id for "icon" select
+        newScopeSelectId: 'pf-map-dialog-new-scope-select',                             // id for "scope" select
+        newTypeSelectId: 'pf-map-dialog-new-type-select',                               // id for "type" select
+
+        // edit map form
+        editNameInputId: 'pf-map-dialog-edit-name-input',                               // id for "name" input
+        editIconSelectId: 'pf-map-dialog-edit-icon-select',                             // id for "icon" select
+        editScopeSelectId: 'pf-map-dialog-edit-scope-select',                           // id for "scope" select
+        editTypeSelectId: 'pf-map-dialog-edit-type-select',                             // id for "type" select
+
+        // settings map form
         deleteExpiredConnectionsId: 'pf-map-dialog-delete-connections-expired',         // id for "deleteExpiredConnections" checkbox
         deleteEolConnectionsId: 'pf-map-dialog-delete-connections-eol',                 // id for "deleteEOLConnections" checkbox
         persistentAliasesId: 'pf-map-dialog-persistent-aliases',                        // id for "persistentAliases" checkbox
+        persistentSignaturesId: 'pf-map-dialog-persistent-signatures',                  // id for "persistentSignatures" checkbox
+        trackAbyssalJumpsId: 'pf-map-dialog-track-abyss-jumps',                         // id for "trackAbyssalJumps" checkbox
 
         logHistoryId: 'pf-map-dialog-history',                                          // id for "history logging" checkbox
         logActivityId: 'pf-map-dialog-activity',                                        // id for "activity" checkbox
@@ -84,130 +100,42 @@ define([
                 'text!templates/form/map.html',
                 'mustache'
             ], (templateMapDialog, templateMapForm, Mustache) => {
+                let selectOption = value => () => (val, render) => {
+                    if(render(val) === String(value)){
+                        return 'selected';
+                    }
+                };
 
                 let dialogTitle = 'Map settings';
 
                 // if there are no maps -> hide settings tab
-                let hideSettingsTab = false;
-                let hideEditTab = false;
-                let hideDownloadTab = false;
+                let hideEditTab = mapData === false;
+                let hideSettingsTab = mapData === false;
+                let hideDownloadTab = mapData === false;
 
                 let hasRightMapCreate = true;
-                let hasRightMapUpdate = true;
-                let hasRightMapExport = true;
-                let hasRightMapImport = true;
+                let hasRightMapUpdate = MapUtil ? MapUtil.checkRight('map_update', mapData.config) : true;
+                let hasRightMapExport = MapUtil ? MapUtil.checkRight('map_export', mapData.config) : true;
+                let hasRightMapImport = MapUtil ? MapUtil.checkRight('map_import', mapData.config) : true;
+                let hasRightMapShare  = MapUtil ? MapUtil.checkRight('map_share', mapData.config)  : true;
 
-                if(mapData === false){
-                    hideSettingsTab = true;
-                    hideEditTab = true;
-                    hideDownloadTab = true;
-                }else{
-                    hasRightMapUpdate = MapUtil.checkRight('map_update', mapData.config);
-                    hasRightMapExport = MapUtil.checkRight('map_export', mapData.config);
-                    hasRightMapImport = MapUtil.checkRight('map_import', mapData.config);
-                }
-
-                // available map "types" for a new or existing map
-                let mapTypes = MapUtil.getMapTypes(true);
-
-                let mapFormData = {
-                    scope: MapUtil.getMapScopes(),
-                    type: mapTypes,
-                    icon: MapUtil.getMapIcons(),
-                    formErrorContainerClass: Util.config.formErrorContainerClass,
-                    formWarningContainerClass: Util.config.formWarningContainerClass,
-                    formInfoContainerClass: Util.config.formInfoContainerClass
-                };
-
-                // render "new map" tab content -----------------------------------------------------------------------
-                let mapFormDataNew = $.extend({}, mapFormData, {
-                    hasRightMapForm: hasRightMapCreate
-                });
-                let contentNewMap = Mustache.render(templateMapForm, mapFormDataNew);
-
-                // render "edit map" tab content ----------------------------------------------------------------------
-                let mapFormDataEdit = $.extend({}, mapFormData, {
-                    hasRightMapForm: hasRightMapUpdate
-                });
-                let contentEditMap = Mustache.render(templateMapForm, mapFormDataEdit);
-                contentEditMap = $(contentEditMap);
-
-                // current map access info
-                let accessCharacter = [];
-                let accessCorporation = [];
-                let accessAlliance = [];
-                let deleteExpiredConnections = true;
-                let deleteEolConnections = true;
-                let persistentAliases = true;
-
-                let logActivity = true;
-                let logHistory = true;
-
-                let slackWebHookURL = '';
-                let slackUsername = '';
-                let slackIcon = '';
-                let slackChannelHistory = '';
-                let slackChannelRally = '';
-                let slackEnabled = false;
-                let slackHistoryEnabled = false;
-                let slackRallyEnabled = false;
-                let slackSectionShow = false;
-
-                let discordUsername = '';
-                let discordWebHookURLRally = '';
-                let discordWebHookURLHistory = '';
-                let discordEnabled = false;
-                let discordRallyEnabled = false;
-                let discordHistoryEnabled = false;
-                let discordSectionShow = false;
-
-                if(mapData !== false){
-                    // set current map information
-                    contentEditMap.find('input[name="id"]').val( mapData.config.id );
-                    contentEditMap.find('select[name="icon"]').val( mapData.config.icon );
-                    contentEditMap.find('input[name="name"]').val( mapData.config.name );
-                    contentEditMap.find('select[name="scopeId"]').val( mapData.config.scope.id );
-                    contentEditMap.find('select[name="typeId"]').val( mapData.config.type.id );
-
-                    accessCharacter = mapData.config.access.character;
-                    accessCorporation = mapData.config.access.corporation;
-                    accessAlliance = mapData.config.access.alliance;
-
-                    deleteExpiredConnections = mapData.config.deleteExpiredConnections;
-                    deleteEolConnections = mapData.config.deleteEolConnections;
-                    persistentAliases = mapData.config.persistentAliases;
-
-                    logActivity = mapData.config.logging.activity;
-                    logHistory = mapData.config.logging.history;
-
-                    slackWebHookURL = mapData.config.logging.slackWebHookURL;
-                    slackUsername = mapData.config.logging.slackUsername;
-                    slackIcon = mapData.config.logging.slackIcon;
-                    slackChannelHistory = mapData.config.logging.slackChannelHistory;
-                    slackChannelRally = mapData.config.logging.slackChannelRally;
-                    slackEnabled = Boolean(Util.getObjVal(Init, 'slack.status'));
-                    slackHistoryEnabled = slackEnabled && Boolean(Util.getObjVal(Init.mapTypes, mapData.config.type.name + '.defaultConfig.send_history_slack_enabled'));
-                    slackRallyEnabled = slackEnabled && Boolean(Util.getObjVal(Init.mapTypes, mapData.config.type.name + '.defaultConfig.send_rally_slack_enabled'));
-                    slackSectionShow = (slackEnabled && slackWebHookURL.length > 0);
-
-                    discordUsername = Util.getObjVal(mapData, 'config.logging.discordUsername');
-                    discordWebHookURLRally = Util.getObjVal(mapData, 'config.logging.discordWebHookURLRally');
-                    discordWebHookURLHistory = Util.getObjVal(mapData, 'config.logging.discordWebHookURLHistory');
-                    discordEnabled = Boolean(Util.getObjVal(Init, 'discord.status'));
-                    discordRallyEnabled = discordEnabled && Boolean(Util.getObjVal(Init.mapTypes, mapData.config.type.name + '.defaultConfig.send_rally_discord_enabled'));
-                    discordHistoryEnabled = discordEnabled && Boolean(Util.getObjVal(Init.mapTypes, mapData.config.type.name + '.defaultConfig.send_history_discord_enabled'));
-                    discordSectionShow = (discordEnabled && (discordWebHookURLRally.length > 0 || discordWebHookURLHistory.length > 0));
-
-                    // remove "#" from Slack channels
-                    slackChannelHistory = slackChannelHistory.indexOf('#') === 0 ? slackChannelHistory.substr(1) : slackChannelHistory;
-                    slackChannelRally = slackChannelRally.indexOf('#') === 0 ? slackChannelRally.substr(1) : slackChannelRally;
-                }
+                // available map "type" options data
+                // -> for "new" map tab
+                let mapTypesCreate = MapUtil.getMapTypes(true, 'map_create');
+                // -> for "edit" map tab
+                let mapTypesUpdate = MapUtil.getMapTypes(true, 'map_update');
 
                 // render main dialog ---------------------------------------------------------------------------------
                 let mapDialogData = {
                     id: config.newMapDialogId,
                     mapData: mapData,
-                    type: mapTypes,
+                    type: mapTypesCreate,
+                    select2Class: Util.config.select2Class,
+
+                    hasRightMapUpdate,
+                    hasRightMapExport,
+                    hasRightMapImport,
+                    hasRightMapShare,
 
                     // message container
                     formErrorContainerClass: Util.config.formErrorContainerClass,
@@ -220,67 +148,73 @@ define([
                     openTabSettings: options.tab === 'settings',
                     openTabDownload: options.tab === 'download',
 
-                    dialogMapCreateContainerId: config.dialogMapCreateContainerId,
+                    dialogMapNewContainerId: config.dialogMapNewContainerId,
                     dialogMapEditContainerId: config.dialogMapEditContainerId,
                     dialogMapSettingsContainerId: config.dialogMapSettingsContainerId,
                     dialogMapDownloadContainerId: config.dialogMapDownloadContainerId,
 
-                    hideEditTab: hideEditTab,
-                    hideSettingsTab: hideSettingsTab,
-                    hideDownloadTab: hideDownloadTab,
+                    hideEditTab,
+                    hideSettingsTab,
+                    hideDownloadTab,
 
                     // settings tab --------------
                     deleteExpiredConnectionsId : config.deleteExpiredConnectionsId,
                     deleteEolConnectionsId : config.deleteEolConnectionsId,
                     persistentAliasesId : config.persistentAliasesId,
-                    deleteExpiredConnections: deleteExpiredConnections,
-                    deleteEolConnections: deleteEolConnections,
-                    persistentAliases: persistentAliases,
-
+                    persistentSignaturesId : config.persistentSignaturesId,
+                    trackAbyssalJumpsId : config.trackAbyssalJumpsId,
                     logHistoryId: config.logHistoryId,
                     logActivityId: config.logActivityId,
-                    logActivity: logActivity,
-                    logHistory: logHistory,
+
+                    deleteExpiredConnections: true,
+                    deleteEolConnections: true,
+                    persistentAliases: true,
+                    persistentSignatures: true,
+                    trackAbyssalJumps: true,
+                    logActivity: true,
+                    logHistory: true,
 
                     slackWebHookURLId: config.slackWebHookURLId,
                     slackUsernameId: config.slackUsernameId,
                     slackIconId: config.slackIconId,
                     slackChannelHistoryId: config.slackChannelHistoryId,
                     slackChannelRallyId: config.slackChannelRallyId,
-                    slackWebHookURL: slackWebHookURL,
-                    slackUsername: slackUsername,
-                    slackIcon: slackIcon,
-                    slackChannelHistory: slackChannelHistory,
-                    slackChannelRally: slackChannelRally,
-                    slackEnabled: slackEnabled,
-                    slackHistoryEnabled: slackHistoryEnabled,
-                    slackRallyEnabled: slackRallyEnabled,
-                    slackSectionShow: slackSectionShow,
+
+                    slackWebHookURL: '',
+                    slackUsername: '',
+                    slackIcon: '',
+                    slackChannelHistory: '',
+                    slackChannelRally: '',
+                    slackEnabled: false,
+                    slackHistoryEnabled: false,
+                    slackRallyEnabled: false,
+                    slackSectionShow: false,
 
                     discordUsernameId: config.discordUsernameId,
                     discordWebHookURLRallyId: config.discordWebHookURLRallyId,
                     discordWebHookURLHistoryId: config.discordWebHookURLHistoryId,
-                    discordUsername: discordUsername,
-                    discordWebHookURLRally: discordWebHookURLRally,
-                    discordWebHookURLHistory: discordWebHookURLHistory,
-                    discordEnabled: discordEnabled,
-                    discordRallyEnabled: discordRallyEnabled,
-                    discordHistoryEnabled: discordHistoryEnabled,
-                    discordSectionShow: discordSectionShow,
 
+                    discordUsername: '',
+                    discordWebHookURLRally: '',
+                    discordWebHookURLHistory: '',
+                    discordEnabled: false,
+                    discordRallyEnabled: false,
+                    discordHistoryEnabled: false,
+                    discordSectionShow: false,
+
+                    // map access ----------------
                     characterSelectId: config.characterSelectId,
                     corporationSelectId: config.corporationSelectId,
                     allianceSelectId: config.allianceSelectId,
-
-                    // map access objects --------
-                    accessCharacter: accessCharacter,
-                    accessCorporation: accessCorporation,
-                    accessAlliance: accessAlliance,
 
                     // access limitations --------
                     maxCharacter: Init.mapTypes.private.defaultConfig.max_shared,
                     maxCorporation: Init.mapTypes.corporation.defaultConfig.max_shared,
                     maxAlliance: Init.mapTypes.alliance.defaultConfig.max_shared,
+
+                    accessCharacter: [],
+                    accessCorporation: [],
+                    accessAlliance: [],
 
                     // download tab --------------
                     dialogMapExportFormId: config.dialogMapExportFormId,
@@ -291,25 +225,101 @@ define([
                     fieldImportId: config.fieldImportId,
                     dialogMapImportInfoId: config.dialogMapImportInfoId,
 
-                    hasRightMapUpdate: hasRightMapUpdate,
-                    hasRightMapExport: hasRightMapExport,
-                    hasRightMapImport: hasRightMapImport,
-
-                    formatFilename: function(){
-                        // format filename from "map name" (initial)
-                        return function (mapName, render) {
-                            let filename = render(mapName);
-                            return formatFilename(filename);
-                        };
-                    }
+                    formatFilename: () => (mapName, render) => formatFilename(render(mapName))
                 };
+
+                if(mapData !== false){
+                    Object.assign(mapDialogData, {
+                        deleteExpiredConnections: mapData.config.deleteExpiredConnections,
+                        deleteEolConnections: mapData.config.deleteEolConnections,
+                        persistentAliases: mapData.config.persistentAliases,
+                        persistentSignatures: mapData.config.persistentSignatures,
+                        trackAbyssalJumps: mapData.config.trackAbyssalJumps,
+                        logActivity: mapData.config.logging.activity,
+                        logHistory: mapData.config.logging.history,
+
+                        slackWebHookURL: mapData.config.logging.slackWebHookURL,
+                        slackUsername: mapData.config.logging.slackUsername,
+                        slackIcon: mapData.config.logging.slackIcon,
+                        slackChannelHistory: mapData.config.logging.slackChannelHistory,
+                        slackChannelRally: mapData.config.logging.slackChannelRally,
+                        slackEnabled: Boolean(Util.getObjVal(Init, 'slack.status')),
+
+                        discordUsername: Util.getObjVal(mapData, 'config.logging.discordUsername'),
+                        discordWebHookURLRally: Util.getObjVal(mapData, 'config.logging.discordWebHookURLRally'),
+                        discordWebHookURLHistory: Util.getObjVal(mapData, 'config.logging.discordWebHookURLHistory'),
+                        discordEnabled: Boolean(Util.getObjVal(Init, 'discord.status')),
+
+                        accessCharacter: mapData.config.access.character,
+                        accessCorporation: mapData.config.access.corporation,
+                        accessAlliance: mapData.config.access.alliance
+                    });
+
+                    Object.assign(mapDialogData, {
+                        // remove "#" from Slack channels
+                        slackChannelHistory: mapDialogData.slackChannelHistory.indexOf('#') === 0 ? mapDialogData.slackChannelHistory.substr(1) : mapDialogData.slackChannelHistory,
+                        slackChannelRally: mapDialogData.slackChannelRally.indexOf('#') === 0 ? mapDialogData.slackChannelRally.substr(1) : mapDialogData.slackChannelRally,
+
+                        slackHistoryEnabled: mapDialogData.slackEnabled && Boolean(Util.getObjVal(Init.mapTypes, mapData.config.type.name + '.defaultConfig.send_history_slack_enabled')),
+                        slackRallyEnabled: mapDialogData.slackEnabled && Boolean(Util.getObjVal(Init.mapTypes, mapData.config.type.name + '.defaultConfig.send_rally_slack_enabled')),
+                        slackSectionShow: (mapDialogData.slackEnabled && mapDialogData.slackWebHookURL.length > 0),
+
+                        discordRallyEnabled: mapDialogData.discordEnabled && Boolean(Util.getObjVal(Init.mapTypes, mapData.config.type.name + '.defaultConfig.send_rally_discord_enabled')),
+                        discordHistoryEnabled: mapDialogData.discordEnabled && Boolean(Util.getObjVal(Init.mapTypes, mapData.config.type.name + '.defaultConfig.send_history_discord_enabled')),
+                        discordSectionShow: (mapDialogData.discordEnabled && (mapDialogData.discordWebHookURLRally.length > 0 || mapDialogData.discordWebHookURLHistory.length > 0)),
+                    });
+                }
 
                 let contentDialog = Mustache.render(templateMapDialog, mapDialogData);
                 contentDialog = $(contentDialog);
 
-                // set tab content
-                $('#' + config.dialogMapCreateContainerId, contentDialog).html(contentNewMap);
-                $('#' + config.dialogMapEditContainerId, contentDialog).html(contentEditMap);
+                // "new map" + "edit map" tab base --------------------------------------------------------------------
+                let mapFormData = {
+                    select2Class: Util.config.select2Class,
+                    scope: MapUtil.getMapScopes(),
+                    icon: MapUtil.getMapIcons(),
+                    formErrorContainerClass: Util.config.formErrorContainerClass,
+                    formWarningContainerClass: Util.config.formWarningContainerClass,
+                    formInfoContainerClass: Util.config.formInfoContainerClass
+                };
+
+                // render "new map" tab content -----------------------------------------------------------------------
+                let mapFormDataNew = Object.assign({}, mapFormData, {
+                    type: mapTypesCreate,
+                    hasRightMapForm: hasRightMapCreate,
+                    nameInputId: config.newNameInputId,
+                    iconSelectId: config.newIconSelectId,
+                    scopeSelectId: config.newScopeSelectId,
+                    typeSelectId: config.newTypeSelectId,
+
+                    mapId: 0,
+                    mapIcon: undefined,
+                    mapName: undefined,
+                    mapScopeId: undefined,
+                    mapTypeId: undefined
+                });
+                let contentNewMap = Mustache.render(templateMapForm, mapFormDataNew);
+                $('#' + config.dialogMapNewContainerId, contentDialog).html(contentNewMap);
+
+                // render "edit map" tab content ----------------------------------------------------------------------
+                if(!hideEditTab){
+                    let mapFormDataEdit = Object.assign({}, mapFormData, {
+                        type: mapTypesUpdate,
+                        hasRightMapForm: hasRightMapUpdate,
+                        nameInputId: config.editNameInputId,
+                        iconSelectId: config.editIconSelectId,
+                        scopeSelectId: config.editScopeSelectId,
+                        typeSelectId: config.editTypeSelectId,
+
+                        mapId: mapData.config.id,
+                        mapIcon: selectOption(mapData.config.icon),
+                        mapName: mapData.config.name,
+                        mapScopeId: selectOption(mapData.config.scope.id),
+                        mapTypeId: selectOption(mapData.config.type.id)
+                    });
+                    let contentEditMap = Mustache.render(templateMapForm, mapFormDataEdit);
+                    $('#' + config.dialogMapEditContainerId, contentDialog).html(contentEditMap);
+                }
 
                 let mapInfoDialog = bootbox.dialog({
                     title: dialogTitle,
@@ -322,8 +332,7 @@ define([
                         success: {
                             label: '<i class="fas fa-check fa-fw"></i>&nbsp;save',
                             className: 'btn-success',
-                            callback: function() {
-
+                            callback: function(){
                                 // get the current active form
                                 let form = $('#' + config.newMapDialogId).find('form').filter(':visible');
 
@@ -343,10 +352,7 @@ define([
                                 });
 
                                 // check whether the form is valid
-                                let formValid = form.isValidForm();
-
-                                if(formValid === true){
-
+                                if(form.isValidForm()){
                                     // lock dialog
                                     let dialogContent = mapInfoDialog.find('.modal-content');
                                     dialogContent.showLoadingAnimation();
@@ -355,67 +361,39 @@ define([
                                     let formData = form.getFormValues();
 
                                     // add value prefixes (Slack channels)
-                                    let tmpVal;
-                                    if(typeof (tmpVal = Util.getObjVal(formData, 'slackChannelHistory')) === 'string' && tmpVal.length){
-                                        formData.slackChannelHistory = '#' + tmpVal;
-                                    }
-                                    if(typeof (tmpVal = Util.getObjVal(formData, 'slackChannelRally')) === 'string' && tmpVal.length){
-                                        formData.slackChannelRally = '#' + tmpVal;
+                                    Object.keys(formData).map((key, index) => {
+                                        if(['slackChannelHistory', 'slackChannelRally'].includes(key))
+                                            formData[key] = (formData[key].length ? '#' : '') + formData[key];
+                                    });
+
+                                    if(mapData){
+                                        // no map data found -> probably new user
+                                        MapOverlayUtil.getMapOverlay(mapData.map.getContainer(), 'timer').startMapUpdateCounter();
                                     }
 
-                                    // checkbox fix -> settings tab
-                                    if( form.find('#' + config.deleteExpiredConnectionsId).length ){
-                                        formData.deleteExpiredConnections = formData.hasOwnProperty('deleteExpiredConnections') ? parseInt( formData.deleteExpiredConnections ) : 0;
-                                    }
-                                    if( form.find('#' + config.deleteEolConnectionsId).length ){
-                                        formData.deleteEolConnections = formData.hasOwnProperty('deleteEolConnections') ? parseInt( formData.deleteEolConnections ) : 0;
-                                    }
-                                    if( form.find('#' + config.persistentAliasesId).length ){
-                                        formData.persistentAliases = formData.hasOwnProperty('persistentAliases') ? parseInt( formData.persistentAliases ) : 0;
-                                    }
-                                    if( form.find('#' + config.persistentAliasesId).length ){
-                                        formData.persistentAliases = formData.hasOwnProperty('persistentAliases') ? parseInt( formData.persistentAliases ) : 0;
-                                    }
-                                    if( form.find('#' + config.logHistoryId).length ){
-                                        formData.logHistory = formData.hasOwnProperty('logHistory') ? parseInt( formData.logHistory ) : 0;
-                                    }
-                                    if( form.find('#' + config.logActivityId).length ){
-                                        formData.logActivity = formData.hasOwnProperty('logActivity') ? parseInt( formData.logActivity ) : 0;
-                                    }
+                                    let method = formData.id ? 'PATCH' : 'PUT';
 
-                                    let requestData = {formData: formData};
-
-                                    $.ajax({
-                                        type: 'POST',
-                                        url: Init.path.saveMap,
-                                        data: requestData,
-                                        dataType: 'json'
-                                    }).done(function(responseData){
-
-                                        if(responseData.error.length){
-                                            form.showFormMessage(responseData.error);
-                                        }else{
-                                            // success
-                                            Util.showNotify({title: dialogTitle, text: 'Map: ' + responseData.mapData.mapData.name, type: 'success'});
+                                    Util.request(method, 'Map', formData.id, formData, {
+                                        formElement: form // for error form messages
+                                    }, context => {
+                                        // always do
+                                        dialogContent.hideLoadingAnimation();
+                                    }).then(
+                                        payload => {
+                                            let mapData = Util.getObjVal(payload, 'data.mapData');
+                                            Util.showNotify({title: dialogTitle, text: `Map: ${Util.getObjVal(mapData, 'name')}`, type: 'success'});
 
                                             // update map-tab Element
-                                            let tabLinkElement = Util.getMapModule().getMapTabElements(responseData.mapData.mapData.id);
-
-                                            if(tabLinkElement.length === 1){
-                                                ModuleMap.updateTabData(tabLinkElement, responseData.mapData.mapData);
+                                            let tabLinkEls = Util.getMapTabLinkElements(Util.getMapModule()[0], Util.getObjVal(mapData, 'id'));
+                                            if(tabLinkEls.length === 1){
+                                                ModuleMap.updateTabData(tabLinkEls[0], mapData);
                                             }
 
                                             $(mapInfoDialog).modal('hide');
-                                            $(document).trigger('pf:closeMenu', [{}]);
-                                        }
-                                    }).fail(function( jqXHR, status, error) {
-                                        let reason = status + ' ' + error;
-                                        Util.showNotify({title: jqXHR.status + ': saveMap', text: reason, type: 'warning'});
-                                        $(document).setProgramStatus('problem');
-
-                                    }).always(function() {
-                                        dialogContent.hideLoadingAnimation();
-                                    });
+                                            Util.triggerMenuAction(document, 'Close');
+                                        },
+                                        Util.handleAjaxErrorResponse
+                                    );
                                 }
 
                                 return false;
@@ -423,7 +401,6 @@ define([
                         }
                     }
                 });
-
 
                 // after modal is shown ===============================================================================
                 mapInfoDialog.on('shown.bs.modal', function(e){
@@ -434,10 +411,20 @@ define([
 
                     // prevent "disabled" tabs from being clicked... "bootstrap" bugFix...
                     mapInfoDialog.find('.navbar a[data-toggle=tab]').on('click', function(e){
-                        if ($(this).hasClass('disabled')){
+                        if($(this).hasClass('disabled')){
                             e.preventDefault();
                             return false;
                         }
+                    });
+
+                    // make <select>s to Select2 fields
+                    mapInfoDialog.find(
+                        '#' + config.dialogMapNewContainerId + ' .' + Util.config.select2Class + ', ' +
+                        '#' + config.dialogMapEditContainerId + ' .' + Util.config.select2Class + ', ' +
+                        '#' + config.dialogMapDownloadContainerId + ' .' + Util.config.select2Class
+                    ).select2({
+                        minimumResultsForSearch: -1,
+                        width: '100%'
                     });
 
                     // set form validator
@@ -447,11 +434,11 @@ define([
                     // get current active form(tab)
                     let form = $('#' + config.newMapDialogId).find('form').filter(':visible');
 
-                    form.showFormMessage([{type: 'info', message: 'Creating new maps or change settings may take a few seconds'}]);
+                    form.showFormMessage([{type: 'info', text: 'Creating new maps or change settings may take a few seconds'}]);
 
-                    if(mapData === false){
-                        // no map data found (probably new user
-                        form.showFormMessage([{type: 'warning', message: 'No maps found. Create a new map before you can start'}]);
+                    if(!mapData){
+                        // no map data found -> probably new user
+                        form.showFormMessage([{type: 'warning', text: 'No maps found. Create a new map before you can start'}]);
                     }
 
                     // init "download tab" ============================================================================
@@ -460,7 +447,7 @@ define([
                         // tab exists
 
                         // export map data ----------------------------------------------------------------------------
-                        downloadTabElement.find('#' + config.buttonExportId).on('click', { mapData: mapData }, function(e){
+                        downloadTabElement.find('#' + config.buttonExportId).on('click', {mapData}, function(e){
 
                             let exportForm = $('#' + config.dialogMapExportFormId);
                             let validExportForm = exportForm.isValidForm();
@@ -472,16 +459,14 @@ define([
                                     // IMPORTANT: Get map data from client (NOT from global mapData which is available in here)
                                     // -> This excludes some data (e.g. wh statics)
                                     // -> Bring export inline with main map toggle requests
-                                    let exportMapData = mapElement.getMapDataFromClient({
-                                        forceData: true,
-                                        getAll: true
-                                    });
+                                    let exportMapData = mapElement.getMapDataFromClient(['hasId']);
 
+                                    let exportButton = $(this);
                                     // set map data right before download
-                                    $(this).setExportMapData(exportMapData);
+                                    setExportMapData(exportButton, exportMapData);
 
                                     // disable button
-                                    $(this).attr('disabled', true);
+                                    exportButton.attr('disabled', true);
                                 }else{
                                     console.error('Map not found');
                                 }
@@ -507,7 +492,7 @@ define([
                                 let output = [];
                                 let files = e.target.files;
 
-                                for (let i = 0, f; !!(f = files[i]); i++) {
+                                for(let i = 0, f; !!(f = files[i]); i++){
                                     output.push(( i + 1 ) + '. file: ' + f.name + ' - ' +
                                         f.size + ' bytes; last modified: ' +
                                         f.lastModifiedDate.toLocaleDateString() );
@@ -528,14 +513,14 @@ define([
                             let filesCountFail = 0;
 
                             // onLoad for FileReader API
-                            let readerOnLoad = function(readEvent) {
+                            let readerOnLoad = function(readEvent){
 
                                 // get file content
                                 try{
                                     importData.mapData.push( JSON.parse( readEvent.target.result ) );
                                 }catch(error){
                                     filesCountFail++;
-                                    importFormElement.showFormMessage([{type: 'error', message: 'File can not be parsed'}]);
+                                    importFormElement.showFormMessage([{type: 'error', text: 'File can not be parsed'}]);
                                 }
 
                                 // start import when all files are parsed
@@ -543,11 +528,13 @@ define([
                                     filesCount === files.length &&
                                     filesCountFail === 0
                                 ){
-                                    importMaps(importData);
+                                    importMaps(importData, () => {
+                                        mapInfoDialog.modal('hide');
+                                    });
                                 }
                             };
 
-                            let handleDragOver = function(dragEvent) {
+                            let handleDragOver = function(dragEvent){
                                 dragEvent.stopPropagation();
                                 dragEvent.preventDefault();
                                 dragEvent.dataTransfer.dropEffect = 'copy'; // Explicitly show this is a copy.
@@ -564,7 +551,7 @@ define([
 
                                 files = evt.dataTransfer.files; // FileList object.
 
-                                for (let file; !!(file = files[filesCount]); filesCount++){
+                                for(let file; !!(file = files[filesCount]); filesCount++){
                                     let reader = new FileReader();
                                     reader.onload = readerOnLoad;
                                     reader.readAsText(file);
@@ -578,7 +565,7 @@ define([
                             }
 
                             // import "button"
-                            downloadTabElement.find('#' + config.buttonImportId).on('click', function(e) {
+                            downloadTabElement.find('#' + config.buttonImportId).on('click', function(e){
 
                                 importFormElement.validator('validate');
                                 let validImportForm = importFormElement.isValidForm();
@@ -592,7 +579,7 @@ define([
                                     filesCount = 0;
                                     filesCountFail = 0;
 
-                                    for (let file; !!(file = files[filesCount]); filesCount++){
+                                    for(let file; !!(file = files[filesCount]); filesCount++){
                                         let reader = new FileReader();
                                         reader.onload = readerOnLoad;
                                         reader.readAsText(file);
@@ -600,7 +587,7 @@ define([
                                 }
                             });
                         }else{
-                            importFormElement.showFormMessage([{type: 'error', message: 'The File APIs are not fully supported in this browser.'}]);
+                            importFormElement.showFormMessage([{type: 'error', text: 'The File APIs are not fully supported in this browser.'}]);
                         }
                     }
                 });
@@ -652,9 +639,9 @@ define([
     /**
      * import new map(s) data
      * @param importData
+     * @param callback
      */
-    let importMaps = function(importData){
-
+    let importMaps = (importData, callback) => {
         let importForm = $('#' + config.dialogMapImportFormId);
         importForm.hideFormMessage('all');
 
@@ -677,12 +664,16 @@ define([
                     importForm.showFormMessage(responseData.warning);
                 }
 
+                if(callback){
+                    callback();
+                }
+
                 Util.showNotify({title: 'Import finished', text: 'Map(s) imported', type: 'success'});
             }
-        }).fail(function( jqXHR, status, error) {
+        }).fail(function(jqXHR, status, error){
             let reason = status + ' ' + error;
             Util.showNotify({title: jqXHR.status + ': importMap', text: reason, type: 'error'});
-        }).always(function() {
+        }).always(function(){
             importForm.find('input, select').resetFormFields().trigger('change');
             dialogContent.hideLoadingAnimation();
         });
@@ -690,10 +681,10 @@ define([
 
     /**
      * set json map data for export to an element (e.g. <a>-Tag or button) for download
+     * @param element
      * @param mapData
-     * @returns {*}
      */
-    $.fn.setExportMapData = function(mapData){
+    let setExportMapData = (element, mapData) => {
 
         let fieldExport = $('#' + config.fieldExportId);
         let filename = '';
@@ -707,19 +698,15 @@ define([
             }
         }
 
-        return this.each(function(){
-            let exportButton = $(this);
-            exportButton.attr('href', 'data:' + mapDataEncoded);
-            exportButton.attr('download', filename + '.json');
-        });
+        element.attr('href', 'data:' + mapDataEncoded);
+        element.attr('download', filename + '.json');
     };
-
 
     /**
      * init select2 fields within the settings dialog
      * @param mapInfoDialog
      */
-    let initSettingsSelectFields = function(mapInfoDialog){
+    let initSettingsSelectFields = mapInfoDialog => {
 
         let selectElementCharacter = mapInfoDialog.find('#' + config.characterSelectId);
         let selectElementCorporation = mapInfoDialog.find('#' + config.corporationSelectId);
@@ -749,35 +736,32 @@ define([
      * @param mapData
      */
     $.fn.showDeleteMapDialog = function(mapData){
-        let mapName = mapData.config.name;
-        let mapNameStr = '<span class="txt-color txt-color-danger">' + mapName + '</span>';
+        let mapId = Util.getObjVal(mapData, 'config.id');
+        let mapName = Util.getObjVal(mapData, 'config.name');
+        if(!mapId) return;
+
+        let mapNameStr = `<span class="txt-color txt-color-danger">${mapName}</span>`;
 
         let mapDeleteDialog = bootbox.confirm({
-            message: 'Delete map "' + mapNameStr + '"?',
+            message: `Delete map "${mapNameStr}"?`,
             buttons: {
                 confirm: {
                     label: '<i class="fas fa-trash fa-fw"></i>&nbsp;delete map',
                     className: 'btn-danger'
                 }
             },
-            callback: function(result){
+            callback: result => {
                 if(result){
-                    let data = {mapData: mapData.config};
+                    // lock dialog
+                    let dialogContent = mapDeleteDialog.find('.modal-content');
+                    dialogContent.showLoadingAnimation();
 
-                    $.ajax({
-                        type: 'POST',
-                        url: Init.path.deleteMap,
-                        data: data,
-                        dataType: 'json'
-                    }).done(function(data){
-                        Util.showNotify({title: 'Map deleted', text: 'Map: ' + mapName, type: 'success'});
-                    }).fail(function( jqXHR, status, error) {
-                        let reason = status + ' ' + error;
-                        Util.showNotify({title: jqXHR.status + ': deleteMap', text: reason, type: 'warning'});
-                        $(document).setProgramStatus('problem');
-                    }).always(function() {
-                        $(mapDeleteDialog).modal('hide');
-                    });
+                    Util.request('DELETE', 'Map', mapId, {}, {}).then(
+                        payload => {
+                            Util.showNotify({title: 'Map deleted', text: 'Map: ' + mapName, type: 'success'});
+                        },
+                        Util.handleAjaxErrorResponse
+                    ).finally(() => mapDeleteDialog.modal('hide'));
 
                     return false;
                 }
@@ -785,6 +769,5 @@ define([
         });
 
     };
-
 
 });

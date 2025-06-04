@@ -8,9 +8,10 @@ define([
     'app/init',
     'app/util',
     'app/render',
+    'app/counter',
     'bootbox',
     'peityInlineChart'
-], function($, Init, Util, Render, bootbox) {
+], ($, Init, Util, Render, Counter, bootbox) => {
     'use strict';
 
     let config = {
@@ -27,6 +28,7 @@ define([
         statsContainerId: 'pf-stats-dialog-container',                          // class for statistics container (dynamic ajax content)
         statsTableId: 'pf-stats-table',                                         // id for statistics table element
         tableCellImageClass: 'pf-table-image-cell',                             // class for table "image" cells
+        moduleHeadlineIconClass: 'pf-module-icon-button',                       // class for toolbar icons in the head
 
         // charts
         statsLineChartClass: 'pf-line-chart'                                    // class for inline chart elements
@@ -36,7 +38,7 @@ define([
      * init blank statistics dataTable
      * @param dialogElement
      */
-    let initStatsTable = function(dialogElement){
+    let initStatsTable = dialogElement => {
         let columnNumberWidth = 28;
         let cellPadding = 4;
         let lineChartWidth = columnNumberWidth + (2 * cellPadding);
@@ -73,7 +75,29 @@ define([
         // Due to "complex" table headers, they are already rendered and part of the stats.html file
         let table = dialogElement.find('#' + config.statsTableId);
 
-        let  statsTable = table.DataTable({
+        let statsTable = table.DataTable({
+            dom: '<"flex-row flex-between"<"flex-col"l><"flex-col"B><"flex-col"fS>>' +
+                '<"flex-row"<"flex-col flex-grow"tr>>' +
+                '<"flex-row flex-between"<"flex-col"i><"flex-col"p>>',
+            buttons: {
+                name: 'tableTools',
+                buttons: [
+                    {
+                        extend: 'copy',
+                        tag: 'a',
+                        className: config.moduleHeadlineIconClass,
+                        text: '<i class="fas fa-fw fa-copy"></i> copy',
+                        exportOptions: { orthogonal: 'filter' }
+                    },
+                    {
+                        extend: 'csv',
+                        tag: 'a',
+                        className: config.moduleHeadlineIconClass,
+                        text: '<i class="fas fa-fw fa-download"></i> csv',
+                        exportOptions: { orthogonal: 'filter' }
+                    }
+                ]
+            },
             pageLength: 30,
             lengthMenu: [[10, 20, 30, 50], [10, 20, 30, 50]],
             paging: true,
@@ -82,7 +106,6 @@ define([
             info: true,
             searching: true,
             hover: false,
-            autoWidth: false,
             language: {
                 emptyTable:  'No statistics found',
                 zeroRecords: 'No characters found',
@@ -92,6 +115,7 @@ define([
             columnDefs: [
                 {
                     targets: 0,
+                    name: 'rowIndex',
                     title: '<i class="fas fa-hashtag"></i>',
                     orderable: false,
                     searchable: false,
@@ -100,6 +124,7 @@ define([
                     data: 'character.id'
                 },{
                     targets: 1,
+                    name: 'image',
                     title: '',
                     orderable: false,
                     searchable: false,
@@ -108,11 +133,12 @@ define([
                     data: 'character',
                     render: {
                         _: function(data, type, row, meta){
-                            return '<img src="' + Init.url.ccpImageServer + '/Character/' + data.id + '_32.jpg" />';
+                            return '<img src="' + Util.eveImageUrl('characters', parseInt(data.id)) + '"/>';
                         }
                     }
                 },{
                     targets: 2,
+                    name: 'name',
                     title: 'name',
                     width: 200,
                     data: 'character',
@@ -122,20 +148,16 @@ define([
                     }
                 },{
                     targets: 3,
+                    name: 'lastLogin',
                     title: 'last login',
                     searchable: false,
                     width: 70,
                     className: ['text-right', 'separator-right'].join(' '),
-                    data: 'character',
-                    render: {
-                        _: 'lastLogin',
-                        sort: 'lastLogin'
-                    },
-                    createdCell: function(cell, cellData, rowData, rowIndex, colIndex){
-                        $(cell).initTimestampCounter();
-                    }
+                    data: 'character.lastLogin',
+                    defaultContent: ''
                 },{
                     targets: 4,
+                    name: 'mapCreate',
                     title: '<span title="created" data-toggle="tooltip">C&nbsp;&nbsp;</span>',
                     orderable: false,
                     searchable: false,
@@ -147,6 +169,7 @@ define([
                     }
                 },{
                     targets: 5,
+                    name: 'mapUpdate',
                     title: '<span title="updated" data-toggle="tooltip">U&nbsp;&nbsp;</span>',
                     orderable: false,
                     searchable: false,
@@ -158,6 +181,7 @@ define([
                     }
                 },{
                     targets: 6,
+                    name: 'mapDelete',
                     title: '<span title="deleted" data-toggle="tooltip">D&nbsp;&nbsp;</span>',
                     orderable: false,
                     searchable: false,
@@ -169,6 +193,7 @@ define([
                     }
                 },{
                     targets: 7,
+                    name: 'mapSum',
                     title: 'Σ&nbsp;&nbsp;',
                     searchable: false,
                     width: 20,
@@ -179,6 +204,7 @@ define([
                     }
                 },{
                     targets: 8,
+                    name: 'systemCreate',
                     title: '<span title="created" data-toggle="tooltip">C&nbsp;&nbsp;</span>',
                     orderable: false,
                     searchable: false,
@@ -190,6 +216,7 @@ define([
                     }
                 },{
                     targets: 9,
+                    name: 'systemUpdate',
                     title: '<span title="updated" data-toggle="tooltip">U&nbsp;&nbsp;</span>',
                     orderable: false,
                     searchable: false,
@@ -201,6 +228,7 @@ define([
                     }
                 },{
                     targets: 10,
+                    name: 'systemDelete',
                     title: '<span title="deleted" data-toggle="tooltip">D&nbsp;&nbsp;</span>',
                     orderable: false,
                     searchable: false,
@@ -212,6 +240,7 @@ define([
                     }
                 },{
                     targets: 11,
+                    name: 'systemSum',
                     title: 'Σ&nbsp;&nbsp;',
                     searchable: false,
                     width: 20,
@@ -222,6 +251,7 @@ define([
                     }
                 },{
                     targets: 12,
+                    name: 'connectionCreate',
                     title: '<span title="created" data-toggle="tooltip">C&nbsp;&nbsp;</span>',
                     orderable: false,
                     searchable: false,
@@ -233,6 +263,7 @@ define([
                     }
                 },{
                     targets: 13,
+                    name: 'connectionUpdate',
                     title: '<span title="updated" data-toggle="tooltip">U&nbsp;&nbsp;</span>',
                     orderable: false,
                     searchable: false,
@@ -244,6 +275,7 @@ define([
                     }
                 },{
                     targets: 14,
+                    name: 'connectionDelete',
                     title: '<span title="deleted" data-toggle="tooltip">D&nbsp;&nbsp;</span>',
                     orderable: false,
                     searchable: false,
@@ -255,6 +287,7 @@ define([
                     }
                 },{
                     targets: 15,
+                    name: 'connectionSum',
                     title: 'Σ&nbsp;&nbsp;',
                     searchable: false,
                     width: 20,
@@ -265,6 +298,7 @@ define([
                     }
                 },{
                     targets: 16,
+                    name: 'signatureCreate',
                     title: '<span title="created" data-toggle="tooltip">C&nbsp;&nbsp;</span>',
                     orderable: false,
                     searchable: false,
@@ -276,6 +310,7 @@ define([
                     }
                 },{
                     targets: 17,
+                    name: 'signatureUpdate',
                     title: '<span title="updated" data-toggle="tooltip">U&nbsp;&nbsp;</span>',
                     orderable: false,
                     searchable: false,
@@ -287,6 +322,7 @@ define([
                     }
                 },{
                     targets: 18,
+                    name: 'signatureDelete',
                     title: '<span title="deleted" data-toggle="tooltip">D&nbsp;&nbsp;</span>',
                     orderable: false,
                     searchable: false,
@@ -298,6 +334,7 @@ define([
                     }
                 },{
                     targets: 19,
+                    name: 'signatureSum',
                     title: 'Σ&nbsp;&nbsp;',
                     searchable: false,
                     width: 20,
@@ -308,6 +345,7 @@ define([
                     }
                 },{
                     targets: 20,
+                    name: 'totalSum',
                     title: 'Σ&nbsp;&nbsp;',
                     searchable: false,
                     width: 20,
@@ -324,6 +362,8 @@ define([
                 // initial statistics data request
                 let requestData = getRequestDataFromTabPanels(dialogElement);
                 getStatsData(requestData, {tableApi: tableApi, callback: drawStatsTable});
+
+                Counter.initTableCounter(this, ['lastLogin:name']);
             },
             drawCallback: function(settings){
                 this.api().rows().nodes().to$().each(function(i, row){
@@ -335,7 +375,7 @@ define([
                     });
                 });
             },
-            footerCallback: function ( row, data, start, end, display ) {
+            footerCallback: function(row, data, start, end, display ){
                 let api = this.api();
                 let sumColumnIndexes = [7, 11, 15, 19, 20];
 
@@ -352,7 +392,7 @@ define([
                 });
 
                 $(sumColumnIndexes).each(function(index, value){
-                    $( api.column( value ).footer() ).text( renderNumericColumn(pageTotalColumns[index], 'display') );
+                    $(api.column(value).footer()).text( renderNumericColumn(pageTotalColumns[index], 'display') );
                 });
             },
             data: [] // will be added dynamic
@@ -382,9 +422,8 @@ define([
      * @param requestData
      * @param context
      */
-    let getStatsData = function(requestData, context){
-
-        context.dynamicArea = $('#' + config.statsContainerId + ' .pf-dynamic-area');
+    let getStatsData = (requestData, context) => {
+        context.dynamicArea = $('#' + config.statsContainerId + ' .' + Util.config.dynamicAreaClass);
         context.dynamicArea.showLoadingAnimation();
 
         $.ajax({
@@ -396,8 +435,8 @@ define([
         }).done(function(data){
             this.dynamicArea.hideLoadingAnimation();
 
-            this.callback(data);
-        }).fail(function( jqXHR, status, error) {
+            this.callback(data, this);
+        }).fail(function(jqXHR, status, error){
             let reason = status + ' ' + error;
             Util.showNotify({title: jqXHR.status + ': loadStatistics', text: reason, type: 'warning'});
         });
@@ -408,7 +447,7 @@ define([
      * update "header"/"filter" elements in dialog
      * @param responseData
      */
-    let drawStatsTable = function(responseData){
+    let drawStatsTable = (responseData, context) => {
         let dialogElement = $('#' + config.statsDialogId);
 
         // update filter/header -----------------------------------------------------------------------------
@@ -445,8 +484,8 @@ define([
 
         // clear and (re)-fill table ------------------------------------------------------------------------
         let formattedData = formatStatisticsData(responseData);
-        this.tableApi.clear();
-        this.tableApi.rows.add(formattedData).draw();
+        context.tableApi.clear();
+        context.tableApi.rows.add(formattedData).draw();
     };
 
     /**
@@ -455,7 +494,7 @@ define([
      * @param statsData
      * @returns {Array}
      */
-    let formatStatisticsData = function(statsData){
+    let formatStatisticsData = statsData => {
         let formattedData = [];
         let yearStart = statsData.start.year;
         let weekStart = statsData.start.week;
@@ -665,7 +704,7 @@ define([
      * @param dialogElement
      * @returns {{}}
      */
-    let getRequestDataFromTabPanels = function(dialogElement){
+    let getRequestDataFromTabPanels = dialogElement => {
         let requestData = {};
 
         // get data from "tab" panel links ------------------------------------------------------------------
@@ -733,7 +772,7 @@ define([
      * show activity stats dialog
      */
     $.fn.showStatsDialog = function(){
-        requirejs(['text!templates/dialog/stats.html', 'mustache', 'datatables.loader'], function(template, Mustache) {
+        requirejs(['text!templates/dialog/stats.html', 'mustache'], (template, Mustache) => {
             // get current statistics map settings
             let logActivityEnabled = false;
             let activeMap = Util.getMapModule().getActiveMap();
@@ -786,30 +825,24 @@ define([
                 title: 'Statistics',
                 message: content,
                 size: 'large',
-                show: false,
-                buttons: {
-                    close: {
-                        label: 'close',
-                        className: 'btn-default'
-                    }
-                }
+                show: false
             });
 
             // model events
-            statsDialog.on('show.bs.modal', function(e) {
+            statsDialog.on('show.bs.modal', function(e){
                 let dialogElement = $(e.target);
                 initStatsTable(dialogElement);
             });
 
             // Tab module events
-            statsDialog.find('a[data-toggle="tab"]').on('show.bs.tab', function (e, b, c) {
+            statsDialog.find('a[data-toggle="tab"]').on('show.bs.tab', function(e, b, c){
                 if( $(e.target).parent().hasClass('disabled') ){
                     // no action on "disabled" tabs
                     return false;
                 }
             });
 
-            statsDialog.find('a[data-toggle="tab"]').on('shown.bs.tab', function (e) {
+            statsDialog.find('a[data-toggle="tab"]').on('shown.bs.tab', function(e){
                 let requestData = getRequestDataFromTabPanels(statsDialog);
                 let tableApi = statsDialog.find('#' + config.statsTableId).DataTable();
 

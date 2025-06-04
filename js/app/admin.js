@@ -7,7 +7,7 @@ define([
     'app/init',
     'app/util',
     'datatables.loader'
-], ($, Init, Util) => {
+], ($, Init, Util, dtLoader) => {
 
     'use strict';
 
@@ -34,7 +34,7 @@ define([
                 let targetElement = $('[data-id="' + targetId + '"]');
                 let targetFormFields = targetElement.find('input[type="radio"]');
                 let checkFormFields = [];
-                for(let formField of targetFormFields) {
+                for(let formField of targetFormFields){
                     if(this.checked){
                         if(formField.hasAttribute('data-default') || formField.getAttribute('data-default-value')){
                             checkFormFields.push(formField);
@@ -47,7 +47,7 @@ define([
                     }
                 }
 
-                for(let checkFormField of checkFormFields) {
+                for(let checkFormField of checkFormFields){
                     checkFormField.checked = true;
                 }
             }
@@ -69,24 +69,27 @@ define([
         Util.initDefaultBootboxConfig();
 
         // hide splash loading animation
-        $('.' + config.splashOverlayClass).hideSplashOverlay();
+        $('.' + config.splashOverlayClass + '[data-status="ok"]').hideSplashOverlay();
 
         setPageObserver();
 
-        let temp = $('.dataTable').dataTable( {
-            pageLength: 100,
-            paging: true,
-            ordering: true,
-            autoWidth: false,
-            hover: false,
-            language: {
-                emptyTable:  'No entries',
-                zeroRecords: 'No entries found',
-                lengthMenu:  'Show _MENU_ entries',
-                info:        'Showing _START_ to _END_ of _TOTAL_ entries'
-            }
+        dtLoader.initDefaultConfig({
+            breakpoints: Init.breakpoints
+        }).then(() => {
+            let temp = $('.dataTable').dataTable({
+                pageLength: 100,
+                paging: true,
+                ordering: true,
+                autoWidth: false,
+                hover: false,
+                language: {
+                    emptyTable:  'No entries',
+                    zeroRecords: 'No entries found',
+                    lengthMenu:  'Show _MENU_ entries',
+                    info:        'Showing _START_ to _END_ of _TOTAL_ entries'
+                },
+                data: null      // use DOM data overwrites [] default -> data.loader.js
+            });
         });
-
-
     });
 });

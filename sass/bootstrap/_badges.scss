@@ -17,7 +17,7 @@
   text-align: center;
   background-color: $badge-bg;
   text-indent: initial;
-  @include border-radius($badge-border-radius);
+  border-radius: $badge-border-radius;
 
 
   // Empty badges collapse automatically (not available in IE8)
@@ -28,7 +28,7 @@
   // Quick fix for badges in buttons
   .btn & {
     position: relative;
-    top: 1px;
+    //top: 1px; // sig table "delete" button is not "inline" with badge if 1px is set...
   }
   .btn-xs & {
     top: 0;
@@ -54,4 +54,15 @@ a.list-group-item.active > .badge,
 }
 .nav-pills > li > a > .badge {
   margin-left: 3px;
+}
+
+// Colors
+// Contextual variations
+
+.badge-warning {
+  @include badge-variant($badge-warning-bg);
+}
+
+.badge-danger {
+  @include badge-variant($badge-danger-bg);
 }
